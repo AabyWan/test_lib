@@ -1,11 +1,17 @@
 import pandas as pd
+import numpy as np
+from copy import deepcopy
 from joblib import Parallel, delayed
+from tqdm import tqdm
+
+## Local imports from ..utils
+from ..utils import  ImageLoader
 
 class ComputeHashes():
     """Compute Perceptual Hashes using a defined dictionary of algorithms, \\
         and a corresponding list for transformations to be applies
     """
-    def __init__(self, algorithms:dict, transformations:list, n_jobs=1, backend='loky') -> None:
+    def __init__(self, algorithms:dict, transformations:list, n_jobs=1, backend='loky', progress_bar=False) -> None:
         """_summary_
 
         Args:
@@ -18,6 +24,7 @@ class ComputeHashes():
         self.trans = transformations
         self.n_jobs = n_jobs
         self.backend = backend
+        self.progress_bar = progress_bar
 
     def fit(self, paths:list) -> pd.DataFrame:
         """Run the computation
@@ -35,7 +42,7 @@ class ComputeHashes():
             img_path=p,
             algorithms=self.algos,
             transformations=self.trans
-            ) for p in paths)
+            ) for p in tqdm(paths, desc="Files", disable=not self.progress_bar))
         
         # joblib returns a list of numpy arrays from sim_hashing
         # the length depends on how many transformations are applied

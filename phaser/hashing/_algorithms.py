@@ -1,14 +1,12 @@
 import imagehash
 import pdqhash
 import numpy as np
-from copy import deepcopy
 from joblib import Parallel, delayed
 from abc import ABC, abstractmethod
 import pandas as pd
 
-
 # Local imports from ..utils
-from ..utils import ImageLoader, bool2binstring
+from ..utils import  bool2binstring
 
 
 class PerceptualHash(ABC):

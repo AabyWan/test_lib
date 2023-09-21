@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import distance as dist
 from itertools import combinations
+from tqdm import tqdm
 
 def find_inter_samplesize(num_images) -> int:
     for n in range(0,num_images):
@@ -11,7 +12,7 @@ def find_inter_samplesize(num_images) -> int:
 
 # DISTANCE COMPUTATION
 class IntraDistance():
-    def __init__(self, le_t, le_m, le_a, set_class=0):
+    def __init__(self, le_t, le_m, le_a, set_class=0, progress_bar=False):
         """_summary_
 
         Parameters
@@ -32,6 +33,7 @@ class IntraDistance():
         self.le_m = le_m
         self.le_a = le_a
         self.set_class = set_class
+        self.progress_bar = progress_bar
 
     def intradistance(self, x, algorithm, metric):
         # store the first hash and reshape into 2d array as required by cdist func.
@@ -49,7 +51,7 @@ class IntraDistance():
 
         distances = []
 
-        for a in self.le_a.classes_:
+        for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, desc="Hash"):
             for m in self.le_m.classes_:
 
                 # Compute the distances for each filename
@@ -92,13 +94,14 @@ class IntraDistance():
         return distances
 
 class InterDistance():
-    def __init__(self, le_t, le_m, le_a, set_class=1, n_samples=100, random_state=42):
+    def __init__(self, le_t, le_m, le_a, set_class=1, n_samples=100, random_state=42, progress_bar=False):
         self.le_t = le_t
         self.le_m = le_m
         self.le_a = le_a
         self.set_class = set_class
         self.n_samples = n_samples
         self.random_state = random_state
+        self.progress_bar = progress_bar
 
     def interdistance(self, x, algorithm, metric):
         # get hashes into a 2d array
@@ -132,7 +135,7 @@ class InterDistance():
         distances = []
     
         # Do the math using Pandas groupby
-        for a in self.le_a.classes_:
+        for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, desc="Hash"):
             for m in self.le_m.classes_:
                 # Compute distances for each group of transformations
                 grp_dists = subset.groupby(['transformation']).apply(
