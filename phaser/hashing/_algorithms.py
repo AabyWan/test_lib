@@ -2,13 +2,28 @@ import imagehash
 import pdqhash
 import numpy as np
 from copy import deepcopy
-import pandas as pd
 from joblib import Parallel, delayed
+from abc import ABC, abstractmethod
+import pandas as pd
+
 
 # Local imports from ..utils
 from ..utils import ImageLoader, bool2binstring
 
-class PHASH():
+
+class PerceptualHash(ABC):
+    
+    @abstractmethod
+    def __init__(self):
+        """ Function to initialise the hash function, pass in any parameters here."""
+        pass
+
+    @abstractmethod
+    def fit(self):
+        """ Function that takes in an image and returns a hash digest as a bit string."""
+        pass
+
+class PHASH(PerceptualHash):
     def __init__(self, hash_size=8, highfreq_factor=4):
         self.hash_size=hash_size
         self.highfreq_factor = highfreq_factor
@@ -26,7 +41,7 @@ class PHASH():
         binary_hash = bool2binstring(hash)
         return binary_hash
         
-class ColourHash():
+class ColourHash(PerceptualHash):
     def __init__(self, binbits=3) -> None:
         self.binbits = binbits
 
@@ -40,7 +55,7 @@ class ColourHash():
         binary_hash = bool2binstring(flat_hash)
         return binary_hash
     
-class WaveHash():
+class WaveHash(PerceptualHash):
     def __init__(
             self, 
             hash_size = 8,
@@ -66,7 +81,7 @@ class WaveHash():
         binary_hash = bool2binstring(flat_hash)
         return binary_hash
 
-class PdqHash():
+class PdqHash(PerceptualHash):
     def __init__(self) -> None:
         pass
 
@@ -80,69 +95,5 @@ class PdqHash():
         #hex_hash = bool2hex(flat_hash)
         binary_hash = bool2binstring(flat_hash)
         return binary_hash
-   
-class ComputeHashes():
-    """Compute Perceptual Hashes using a defined dictionary of algorithms, \\
-        and a corresponding list for transformations to be applies
-    """
-    def __init__(self, algorithms:dict, transformations:list, n_jobs=1, backend='loky') -> None:
-        """_summary_
 
-        Args:
-            algorithms (dict): Dictionary containing {'phash': phaser.hashing.PHASH(<settings>)}
-            transformations (list): A list of transformations to be applies [phaser.transformers.Flip(<setting>)]
-            n_jobs (int, optional): How many CPU cores to use. -1 uses all resources. Defaults to 1.
-            backend (str, optional): Pass backend parameter to joblib. Defaults to 'loky'.
-        """
-        self.algos = algorithms
-        self.trans = transformations
-        self.n_jobs = n_jobs
-        self.backend = backend
-
-    def fit(self, paths:list) -> pd.DataFrame:
-        """Run the computation
-
-        Args:
-            paths (list): A list of absolute paths to original images 
-
-        Returns:
-            pd.DataFrame: Dataset containing all computations
-        """
-        hashes = Parallel(
-             n_jobs=self.n_jobs,
-             backend=self.backend
-             )(delayed(sim_hashing)(
-            img_path=p,
-            algorithms=self.algos,
-            transformations=self.trans
-            ) for p in paths)
         
-        # joblib returns a list of numpy arrays from sim_hashing
-        # the length depends on how many transformations are applied
-        # concatenate the list and pass to a dataframe below
-        hashes = np.concatenate(hashes) #type:ignore
-        
-        # derive the column names based on the list of algorithms
-        cols = ['filename','transformation',*list(self.algos.keys())]
-        df = pd.DataFrame(hashes, columns=cols)
-        
-        return df
-
-def sim_hashing(img_path, transformations=[], algorithms={}):
-    image_obj = ImageLoader(img_path)
-    img = deepcopy(image_obj)
-
-    outputs = []
-
-    # loop over a set of algorithms
-    hashes = [a.fit(img.image) for a in algorithms.values()]
-    outputs.append([img.filename, 'orig', *hashes])
-    
-    if len(transformations) > 0:
-        for transform in transformations:
-            _img = transform.fit(img)
-
-            hashes = [a.fit(_img) for a in algorithms.values()]
-            outputs.append([img.filename, transform.aug_name, *hashes])
-    
-    return np.row_stack(outputs)

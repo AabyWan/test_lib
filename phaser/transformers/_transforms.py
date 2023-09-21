@@ -2,10 +2,22 @@ import os
 import pathlib
 from PIL import Image, ImageDraw
 from copy import deepcopy
+from abc import ABC, abstractmethod
 
 from ..utils import ImageLoader
 
-class Border():
+class Transformer(ABC):
+    # Abstract class for transformers. Specifies the interfaces to use when defining a transformer.
+    @abstractmethod
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def fit(self):
+        pass
+
+
+class Border(Transformer):
     def __init__(self, border_color, border_width, saveToPath=''):
         self.bc = border_color
         self.bw = border_width
@@ -28,7 +40,7 @@ class Border():
 
         return image
 
-class Flip():
+class Flip(Transformer):
     def __init__(self, direction, saveToPath='') -> None:
         self.direction = direction.lower()
         self.aug_name = f"Flip_{direction}"
@@ -50,7 +62,7 @@ class Flip():
         
         return image
 
-class TransformFromDisk():
+class TransformFromDisk(Transformer):
      def __init__(self, aug_name) -> None:
          self.aug_name = aug_name
      

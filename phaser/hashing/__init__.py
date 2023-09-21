@@ -9,11 +9,14 @@ Add some important text here to describe or link to examples.
 
 from ._algorithms import (
     PHASH,
-    ComputeHashes,
     ColourHash,
     WaveHash,
     PdqHash
     )
+
+from ._helpers import (
+    ComputeHashes
+)
 
 # Include names of private functions to autodoc
 __all__ = [
