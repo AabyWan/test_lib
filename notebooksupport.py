@@ -8,11 +8,13 @@ from sklearn.preprocessing import LabelEncoder
 
 # for list modules
 from inspect import getmembers, isfunction
+import scipy.spatial.distance
 import phaser
 
 # for comparisons
 import pandas as pd
-from phaser.similarities import find_inter_samplesize, IntraDistance, InterDistance
+from scipy.spatial import distance
+from phaser.similarities import find_inter_samplesize, IntraDistance, InterDistance, validate_metrics
 
 
 def list_modular_components():
@@ -38,9 +40,11 @@ def list_modular_components():
         except TypeError as err:
             pass
 
-    comparison_metrics = [name for name in dir(phaser.similarities._distances) if "_" not in name]
+    builtin_distance_metrics = scipy.spatial.distance._METRICS_NAMES
+    comparison_metrics = phaser.similarities._distances.__DISTANCE_METRICS__
+    print (comparison_metrics)
+    return {"Hashes": hashes, "Transformers": transformers, "Scipy Built-in Distance Metrics": builtin_distance_metrics, "Custom Distance Metrics": comparison_metrics}
 
-    return {"Hashes": hashes, "Transformers": transformers, "Comparison Metrics": comparison_metrics}
 
 def do_hashing(originals_path:str, algorithms:dict, transformers:list, output_directory:str, progress_report:bool=True) -> None:
 
@@ -80,7 +84,7 @@ def do_hashing(originals_path:str, algorithms:dict, transformers:list, output_di
     outfile = os.path.join(output_directory, "hashes.csv.bz2")
     df.to_csv(outfile, index=False, encoding='utf-8', compression=compression_opts)
 
-def calcualte_distances(hash_directory:str, progress_report:bool=True) -> None:
+def calcualte_distances(hash_directory:str, distance_metrics:list, progress_report:bool=True) -> None:
 
     # Read the precomputed hashes from hashes.csv.bz2
     csv_path = os.path.join(hash_directory, "hashes.csv.bz2")
@@ -102,12 +106,14 @@ def calcualte_distances(hash_directory:str, progress_report:bool=True) -> None:
     for a in ALGORITHMS:
         df[a] = df[a].apply(bin2bool) #type:ignore
 
-    # Define the desired SciPy metrics as string values.
-    # TODO make compatible with custom distance functions
-    METRICS = ['hamming','cosine']
-
+    # Validate distance metrics, or throw an Exception.    
+    validate_metrics(distance_metrics)
+    
     # Configure metric LabelEncoder
-    le_m = LabelEncoder().fit(METRICS)
+    le_m = LabelEncoder().fit(list(distance_metrics.keys()))
+
+    METRICS = le_m.classes_
+    print(f"{METRICS=}")
 
     # Dump metric LabelEncoder
     print(f"Saving metric encoder to le_m.")
@@ -115,14 +121,14 @@ def calcualte_distances(hash_directory:str, progress_report:bool=True) -> None:
 
     # Compute the intra distances
     print("\nComputing Intra-distances...")
-    intra = IntraDistance(le_t=le_t, le_m=le_m, le_a=le_a, set_class=1, progress_bar=True)
+    intra = IntraDistance(le_t=le_t, le_m=le_m, le_a=le_a, distance_metrics=distance_metrics, set_class=1, progress_bar=True)
     intra_df = intra.fit(df)
     print(f"Number of total intra-image comparisons = {len(intra_df)}")
 
     # Compute the inter distances using subsampling
     n_samples = find_inter_samplesize(len(df['filename'].unique()*1))
     print(f"\nComputing Inter-distance with {n_samples} samples per image...")
-    inter = InterDistance(le_t, le_m, le_a, set_class=0, n_samples=n_samples, progress_bar=True)
+    inter = InterDistance(le_t, le_m, le_a, distance_metrics=distance_metrics, set_class=0, n_samples=n_samples, progress_bar=True)
     inter_df = inter.fit(df)
 
     print(f"Number of pairwise comparisons = {inter.n_pairs_}")
