@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from copy import deepcopy
 from joblib import Parallel, delayed
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 ## Local imports from ..utils
 from ..utils import ImageLoader

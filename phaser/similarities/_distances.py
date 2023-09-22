@@ -39,4 +39,4 @@ def test_synthetic(u=None, v=None):
 
 
 # Keep track of distance metrics, add here and import in __init__.py when creating new distance metrics.
-__DISTANCE_METRICS__ = [test_synthetic.__name__]
+DISTANCE_METRICS = [test_synthetic.__name__]

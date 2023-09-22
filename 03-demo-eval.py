@@ -51,11 +51,12 @@ fig.savefig(fname=f"./demo_outputs/FIG_inter_df_{t_str}.png")
 
 FIGSIZE = (5, 3)
 # Select a specific metric and hashing algorithm
-m_str = "hamming"
+m_str = "Hamming"
 a_str = "phash"
 
 # Convert to labels
 m_label = le_m.transform(np.array(m_str).ravel())
+print(m_label)
 a_label = le_a.transform(np.array(a_str).ravel())
 
 # Subset data

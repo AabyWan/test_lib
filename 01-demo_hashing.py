@@ -25,7 +25,7 @@ transformers = [
     Flip(direction="Horizontal", saveToPath=""),
 ]
 
-ch = ComputeHashes(algorithms, transformers, n_jobs=-1)
+ch = ComputeHashes(algorithms, transformers, n_jobs=-1, progress_bar=True)
 df = ch.fit(list_of_images)
 
 from sklearn.preprocessing import LabelEncoder

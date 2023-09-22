@@ -1,5 +1,5 @@
 
-import pathlib, os, phaser.hashing, phaser.transformers, phaser.similarities._distances
+import pathlib, os, phaser.hashing, phaser.transformers
 from phaser.utils import ImageLoader as IL
 from phaser.utils import dump_labelencoders, load_labelencoders, bin2bool
 
@@ -7,15 +7,11 @@ from phaser.utils import dump_labelencoders, load_labelencoders, bin2bool
 from sklearn.preprocessing import LabelEncoder
 
 # for list modules
-from inspect import getmembers, isfunction
-import scipy.spatial.distance
-import phaser
+import scipy.spatial.distance 
 
 # for comparisons
 import pandas as pd
-from scipy.spatial import distance
-from phaser.similarities import find_inter_samplesize, IntraDistance, InterDistance, validate_metrics
-
+from phaser.similarities import find_inter_samplesize, IntraDistance, InterDistance, validate_metrics, DISTANCE_METRICS
 
 def list_modular_components():
 
@@ -24,7 +20,7 @@ def list_modular_components():
     hashes = []
     for name in dir(phaser.hashing):
         try:
-            if issubclass(getattr(phaser.hashing, name), phaser.hashing._algorithms.PerceptualHash):
+            if issubclass(getattr(phaser.hashing, name), phaser.hashing.PerceptualHash):
                 hashes.append(name)
         except TypeError as err:
             pass
@@ -35,14 +31,13 @@ def list_modular_components():
     transformers = []
     for name in dir(phaser.transformers):
         try:
-            if issubclass(getattr(phaser.transformers, name), phaser.transformers._transforms.Transformer):
+            if issubclass(getattr(phaser.transformers, name), phaser.transformers.Transformer):
                 transformers.append(name)
         except TypeError as err:
             pass
 
-    builtin_distance_metrics = scipy.spatial.distance._METRICS_NAMES
-    comparison_metrics = phaser.similarities._distances.__DISTANCE_METRICS__
-    print (comparison_metrics)
+    builtin_distance_metrics = scipy.spatial.distance._METRICS_NAMES# Not sure there's a better way to get these.
+    comparison_metrics = DISTANCE_METRICS
     return {"Hashes": hashes, "Transformers": transformers, "Scipy Built-in Distance Metrics": builtin_distance_metrics, "Custom Distance Metrics": comparison_metrics}
 
 
@@ -84,12 +79,11 @@ def do_hashing(originals_path:str, algorithms:dict, transformers:list, output_di
     outfile = os.path.join(output_directory, "hashes.csv.bz2")
     df.to_csv(outfile, index=False, encoding='utf-8', compression=compression_opts)
 
-def calcualte_distances(hash_directory:str, distance_metrics:list, progress_report:bool=True) -> None:
+def calculate_distances(hash_directory:str, distance_metrics:list, progress_report:bool=True) -> None:
 
     # Read the precomputed hashes from hashes.csv.bz2
     csv_path = os.path.join(hash_directory, "hashes.csv.bz2")
-
-    df = pd.read_csv("./demo_outputs/hashes.csv.bz2")
+    df = pd.read_csv(csv_path)
     print(f"Dataframe loaded from {os.path.abspath(csv_path)}")
 
     # Load the Label Encoders used when generating hashes

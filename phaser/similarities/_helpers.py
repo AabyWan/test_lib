@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
-import phaser.similarities
+from ._distances import DISTANCE_METRICS
 from scipy.spatial import distance as dist
 from itertools import combinations
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from typing import Callable
 
 
@@ -36,7 +36,7 @@ def validate_metrics(metrics: dict) -> bool:
         elif isinstance(value, Callable):
             if (
                 value.__name__
-                not in phaser.similarities._distances.__DISTANCE_METRICS__
+                not in DISTANCE_METRICS
             ):
                 invalid.append(
                     f"{mname} does not appear to be a valid distance function in phaser.similarities"
@@ -102,8 +102,8 @@ class IntraDistance:
 
         distances = []
 
-        for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, desc="Hash"):
-            for m in self.le_m.classes_:
+        for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, position=0, desc="Algorithm"):
+            for m in tqdm(self.le_m.classes_, disable=not self.progress_bar, position=1, leave=False,  desc="Metric"):
 
                 # Compute the distances for each filename
                 grp_dists = data.groupby(["filename"]).apply(
@@ -211,8 +211,8 @@ class InterDistance:
         distances = []
 
         # Do the math using Pandas groupby
-        for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, desc="Hash"):
-            for m in self.le_m.classes_:
+        for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, position=0,  desc="Algorithm"):
+            for m in tqdm(self.le_m.classes_, disable=not self.progress_bar, position=1, leave=False, desc="Metric"):
                 # Compute distances for each group of transformations
                 grp_dists = subset.groupby(["transformation"]).apply(
                     self.interdistance,  # type:ignore
