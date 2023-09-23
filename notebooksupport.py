@@ -53,7 +53,7 @@ def do_hashing(originals_path:str, algorithms:dict, transformers:list, output_di
     pathlib.Path(output_directory).mkdir(exist_ok=True)
 
     print("Doing hashing...")
-    ch = phaser.hashing._helpers.ComputeHashes(algorithms, transformers, n_jobs=-1, progress_bar=True)
+    ch = phaser.hashing._helpers.ComputeHashes(algorithms, transformers, n_jobs=-1, progress_bar=progress_report)
     df = ch.fit(list_of_images)
 
     # Create label encoders
@@ -115,7 +115,7 @@ def calculate_distances(hash_directory:str, distance_metrics:list, progress_repo
 
     # Compute the intra distances
     print("\nComputing Intra-distances...")
-    intra = IntraDistance(le_t=le_t, le_m=le_m, le_a=le_a, distance_metrics=distance_metrics, set_class=1, progress_bar=True)
+    intra = IntraDistance(le_t=le_t, le_m=le_m, le_a=le_a, distance_metrics=distance_metrics, set_class=1, progress_bar=progress_report)
     intra_df = intra.fit(df)
     print(f"Number of total intra-image comparisons = {len(intra_df)}")
 
