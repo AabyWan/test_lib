@@ -38,7 +38,7 @@ for transform in TRANSFORMS[:-1]:
 from phaser.plotting import histogram_fig
 
 # Select a specific transform to plot
-t_str = "Border_bw30_bc255.0.0"
+t_str = r"F:/testmods/Border30black"
 
 # Plot for INTER (within images)
 fig = histogram_fig(intra_df, le_a, le_m, t_str)
@@ -55,7 +55,7 @@ fig.savefig(fname=f"./demo_outputs/FIG_inter_df_{t_str}.pdf")
 FIGSIZE = (5, 3)
 # Select a specific metric and hashing algorithm
 m_str = "Hamming"
-a_str = "phash"
+a_str = "pHash"
 
 # Convert to labels
 m_label = le_m.transform(np.array(m_str).ravel())

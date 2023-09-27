@@ -1,5 +1,4 @@
-import os
-import pathlib
+import os, pathlib
 from PIL import Image, ImageDraw
 from copy import deepcopy
 from abc import ABC, abstractmethod
@@ -21,7 +20,7 @@ class Border(Transformer):
     def __init__(self, border_color, border_width, saveToPath=''):
         self.bc = border_color
         self.bw = border_width
-        self.aug_name = f"Border_bw{self.bw}_bc{'.'.join([str(n) for n in self.bc])}"
+        self.name = f"Border_bw{self.bw}_bc{'.'.join([str(n) for n in self.bc])}"
         self.saveToPath = saveToPath
     
     def fit(self, image_obj):
@@ -34,8 +33,8 @@ class Border(Transformer):
             outline=self.bc, width=self.bw)
 
         if self.saveToPath: 
-            path = os.path.join(self.aug_name,image_obj.filename)
-            pathlib.Path(self.aug_name).mkdir(exist_ok=True)
+            path = os.path.join(self.name,image_obj.filename)
+            pathlib.Path(self.name).mkdir(exist_ok=True)
             image.save(path)
 
         return image
@@ -43,7 +42,7 @@ class Border(Transformer):
 class Flip(Transformer):
     def __init__(self, direction, saveToPath='') -> None:
         self.direction = direction.lower()
-        self.aug_name = f"Flip_{direction}"
+        self.name = f"Flip_{direction}"
         self.saveToPath = saveToPath
 
     def fit(self, image_obj):
@@ -56,19 +55,28 @@ class Flip(Transformer):
             image = image.transpose(Image.FLIP_TOP_BOTTOM)
 
         if self.saveToPath : 
-            path = os.path.join(self.aug_name,image_obj.filename)
-            pathlib.Path(self.aug_name).mkdir(exist_ok=True)
+            path = os.path.join(self.name,image_obj.filename)
+            pathlib.Path(self.name).mkdir(exist_ok=True)
             image.save(path)
         
         return image
 
 class TransformFromDisk(Transformer):
-     def __init__(self, aug_name) -> None:
-         self.aug_name = aug_name
+    def __init__(self, dirpath, name="") -> None:
+        self.dirpath = dirpath
+        if not os.path.isdir(self.dirpath):
+            raise Exception(f"Invalid path provided to TransformFromDisk: {self.dirpath}. Expeted a directory.")
+        
+        if name:
+             self.name = name
+        else:
+            # Use the folder name if no name is provided.
+            self.name = os.path.split(os.path.dirname(self.dirpath))[-1]
+            
      
-     def fit(self, image_obj):
+    def fit(self, image_obj):
         filename = image_obj.filename
-        path = os.path.join(self.aug_name, filename)
+        path = os.path.join(self.dirpath, filename)
         image_obj = ImageLoader(path=path)
         
         return image_obj.image # image from disk

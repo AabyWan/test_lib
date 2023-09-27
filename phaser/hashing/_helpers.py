@@ -126,9 +126,9 @@ def sim_hashing(img_path:str, transformations:list=[], algorithms:dict={}) -> np
                         _img = transform.fit(img)
 
                         hashes = [a.fit(_img) for a in algorithms.values()]
-                        outputs.append([img.filename, transform.aug_name, *hashes])
+                        outputs.append([img.filename, transform.name, *hashes])
                     except Exception as err:
-                        logging.error(f"Error applying transform {transform.aug_name} to {img.filename}: {err}.")
+                        logging.error(f"Error applying transform {transform.name} to {img.filename}: {err}.")
                         error=True
                         break
 
@@ -139,10 +139,10 @@ def sim_hashing(img_path:str, transformations:list=[], algorithms:dict={}) -> np
         hashes = [None] * len(algorithms)  # each hash is replaced by NAN
         outputs = []
         outputs.append([img_path, "orig", *hashes])
-        logging.info(f"Errors found, dropping all hashes for {img.filename}.")
+        logging.info(f"Errors found, dropping all hashes for {img_path}.")
         for transform in transformations:
             outputs.append(
-                [img_path, transform.aug_name, *hashes]
+                [img_path, transform.name, *hashes]
             )  # one set of NAN hashes for each transformation
     
     return np.row_stack(outputs)
