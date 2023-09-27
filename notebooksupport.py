@@ -41,7 +41,7 @@ def list_modular_components():
     return {"Hashes": hashes, "Transformers": transformers, "Scipy Built-in Distance Metrics": builtin_distance_metrics, "Custom Distance Metrics": comparison_metrics}
 
 
-def do_hashing(originals_path:str, algorithms:dict, transformers:list, output_directory:str, progress_report:bool=True) -> None:
+def do_hashing(originals_path:str, algorithms:dict, transformers:list, output_directory:str, n_jobs=-1, progress_report:bool=True) -> None:
 
     # Get list of images
     imgpath = originals_path
@@ -53,7 +53,7 @@ def do_hashing(originals_path:str, algorithms:dict, transformers:list, output_di
     pathlib.Path(output_directory).mkdir(exist_ok=True)
 
     print("Doing hashing...")
-    ch = phaser.hashing._helpers.ComputeHashes(algorithms, transformers, n_jobs=-1, progress_bar=progress_report)
+    ch = phaser.hashing._helpers.ComputeHashes(algorithms, transformers, n_jobs=n_jobs, progress_bar=progress_report)
     df = ch.fit(list_of_images)
 
     # Create label encoders

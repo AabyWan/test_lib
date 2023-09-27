@@ -9,7 +9,14 @@ from typing import Callable
 
 
 pathlib.Path("./logs").mkdir(exist_ok=True)
-logging.basicConfig(filename='./logs/process.log', encoding='utf-8', level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+logging.basicConfig(
+    filename="./logs/process.log",
+    encoding="utf-8",
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
 
 def find_inter_samplesize(num_images: int) -> int:
     for n in range(0, num_images):
@@ -38,10 +45,7 @@ def validate_metrics(metrics: dict) -> bool:
         elif not isinstance(value, Callable):
             invalid.append(f"{mname} is not a valid Callable object.")
         elif isinstance(value, Callable):
-            if (
-                value.__name__
-                not in DISTANCE_METRICS
-            ):
+            if value.__name__ not in DISTANCE_METRICS:
                 invalid.append(
                     f"{mname} does not appear to be a valid distance function in phaser.similarities"
                 )
@@ -102,15 +106,25 @@ class IntraDistance:
 
     def fit(self, data):
         logging.info("===Begin processing Intra-Distance.===")
-        
+
         self.files_ = data["filename"].unique()
         self.n_files_ = len(self.files_)
 
         distances = []
 
-        for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, position=0, desc="Algorithm"):
-            for m in tqdm(self.le_m.classes_, disable=not self.progress_bar, position=1, leave=False,  desc="Metric"):
-
+        for a in tqdm(
+            self.le_a.classes_,
+            disable=not self.progress_bar,
+            position=0,
+            desc="Algorithm",
+        ):
+            for m in tqdm(
+                self.le_m.classes_,
+                disable=not self.progress_bar,
+                position=1,
+                leave=False,
+                desc="Metric",
+            ):
                 # Compute the distances for each filename
                 grp_dists = data.groupby(["filename"]).apply(
                     func=self.intradistance, algorithm=a, metric=m
@@ -191,7 +205,9 @@ class InterDistance:
         return dist.pdist(hashes, metric_value)
 
     def fit(self, data):
-        logging.info(f"===Begin processing Inter-Distance with {self.n_samples} pairwise samples per file.===")
+        logging.info(
+            f"===Begin processing Inter-Distance with {self.n_samples} pairwise samples per file.==="
+        )
 
         # Get the label used to encode 'orig'
         orig_label = self.le_t.transform(np.array(["orig"]).ravel())[0]
@@ -221,8 +237,19 @@ class InterDistance:
         distances = []
 
         # Do the math using Pandas groupby
-        for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, position=0,  desc="Algorithm"):
-            for m in tqdm(self.le_m.classes_, disable=not self.progress_bar, position=1, leave=False, desc="Metric"):
+        for a in tqdm(
+            self.le_a.classes_,
+            disable=not self.progress_bar,
+            position=0,
+            desc="Algorithm",
+        ):
+            for m in tqdm(
+                self.le_m.classes_,
+                disable=not self.progress_bar,
+                position=1,
+                leave=False,
+                desc="Metric",
+            ):
                 # Compute distances for each group of transformations
                 grp_dists = subset.groupby(["transformation"]).apply(
                     self.interdistance,  # type:ignore

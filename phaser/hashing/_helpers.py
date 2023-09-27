@@ -10,7 +10,14 @@ from ..utils import ImageLoader
 
 
 pathlib.Path("./logs").mkdir(exist_ok=True)
-logging.basicConfig(filename='./logs/process.log', encoding='utf-8', level=logging.INFO, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+logging.basicConfig(
+    filename="./logs/process.log",
+    encoding="utf-8",
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
 
 class ComputeHashes:
     """Compute Perceptual Hashes using a defined dictionary of algorithms, \\
@@ -52,10 +59,10 @@ class ComputeHashes:
         logging.info(f"===Beginning to process directory {dirpath}===")
 
         hashes = Parallel(n_jobs=self.n_jobs, backend=self.backend)(
-                delayed(sim_hashing)(
-                    img_path=p, algorithms=self.algos, transformations=self.trans
-                )
-                for p in tqdm(paths, desc="Files", disable=not self.progress_bar)
+            delayed(sim_hashing)(
+                img_path=p, algorithms=self.algos, transformations=self.trans
+            )
+            for p in tqdm(paths, desc="Files", disable=not self.progress_bar)
         )
 
         # joblib returns a list of numpy arrays from sim_hashing
@@ -69,18 +76,34 @@ class ComputeHashes:
 
         # remove rows with any nan values
         pre_clean_count = len(df)
-        df.dropna(how='any', inplace=True, axis=0)  
+        df.dropna(how="any", inplace=True, axis=0)
         post_clean_count = len(df)
 
+        # if we have removed some rows, log ths in the logger
         num_removed = pre_clean_count - post_clean_count
-        num_versions = 1 + len(self.trans) # original + transofmrations
-        if num_removed :
-            logging.info(f"Dropped null records for {int(num_removed/num_versions)} files. ")
+        # count how many versions of each file there are (i.e. how many rows per file)
+        num_versions = 1 + len(self.trans)  # original + transofmrations
+        if num_removed:
+            logging.info(
+                f"Dropped null records for {int(num_removed/num_versions)} files. "
+            )
 
         return df
 
 
-def sim_hashing(img_path, transformations=[], algorithms={}):
+def sim_hashing(img_path:str, transformations:list=[], algorithms:dict={}) -> np.ndarray:
+    """_summary_
+
+    Args:
+        img_path (str): Path to the original image
+        transformations (list, optional): List of transformations to apply. Defaults to [].
+        algorithms (dict, optional): List of perceptual hashing algorithms to calculate hashes for. Defaults to {}.
+
+    Returns:
+        np.ndarray: An array of hashes, where each row is [filemame:str, type:str (original or transform name), hashes:list]
+        Note: If the original image fails to load, or there is an error when creating any of the transforms (or looking them up from disk)
+        then all hashes in the response are set to None to avoid incomplete observation sets. (Making them easier to remove later)
+    """
 
     error = False
 
@@ -98,18 +121,28 @@ def sim_hashing(img_path, transformations=[], algorithms={}):
         outputs.append([img.filename, "orig", *hashes])
 
         if len(transformations) > 0:
-            for transform in transformations:
-                _img = transform.fit(img)
+                for transform in transformations:
+                    try:
+                        _img = transform.fit(img)
 
-                hashes = [a.fit(_img) for a in algorithms.values()]
-                outputs.append([img.filename, transform.aug_name, *hashes])
+                        hashes = [a.fit(_img) for a in algorithms.values()]
+                        outputs.append([img.filename, transform.aug_name, *hashes])
+                    except Exception as err:
+                        logging.error(f"Error applying transform {transform.aug_name} to {img.filename}: {err}.")
+                        error=True
+                        break
 
-    else:
+    # Return None for all observations if there was an error at the previous stage
+    if error:
         # An error occured, so we want to abandon this set of observations.
         # Generate stacked np.nan arrays as placeholders to remove later.
-        hashes = [None] * len(algorithms) # each hash is replaced by NAN
+        hashes = [None] * len(algorithms)  # each hash is replaced by NAN
+        outputs = []
         outputs.append([img_path, "orig", *hashes])
+        logging.info(f"Errors found, dropping all hashes for {img.filename}.")
         for transform in transformations:
-            outputs.append([img_path, transform.aug_name, *hashes]) # one set of NAN hashes for each transformation
-
+            outputs.append(
+                [img_path, transform.aug_name, *hashes]
+            )  # one set of NAN hashes for each transformation
+    
     return np.row_stack(outputs)

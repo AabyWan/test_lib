@@ -4,7 +4,7 @@ pathlib.Path("./demo_outputs").mkdir(exist_ok=True)
 
 from phaser.utils import ImageLoader as IL
 from phaser.utils import dump_labelencoders
-from phaser.hashing import PHASH
+from phaser.hashing import PHash
 
 print("Running script.")
 script_dir = f"{os.sep}".join(os.path.abspath(__file__).split(os.sep)[:-1])
@@ -14,9 +14,9 @@ IMGPATH = os.path.join(script_dir, "images")
 
 list_of_images = [str(i) for i in pathlib.Path(IMGPATH).glob("**/*")]
 
-from phaser.hashing import ComputeHashes, PHASH, ColourHash
+from phaser.hashing import ComputeHashes, PHash, ColourHash
 
-algorithms = {"phash": PHASH(hash_size=8, highfreq_factor=4), "colour": ColourHash()}
+algorithms = {"phash": PHash(hash_size=8, highfreq_factor=4), "colour": ColourHash()}
 
 from phaser.transformers import Border, Flip
 

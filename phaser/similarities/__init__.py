@@ -14,5 +14,11 @@ from ._helpers import (
 
 from ._distances import DISTANCE_METRICS, test_synthetic
 
-__all__ = ["IntraDistance", "InterDistance", "find_inter_samplesize", "validate_metrics", "DISTANCE_METRICS", "test_synthetic"]
-
+__all__ = [
+    "IntraDistance",
+    "InterDistance",
+    "find_inter_samplesize",
+    "validate_metrics",
+    "DISTANCE_METRICS",
+    "test_synthetic",
+]

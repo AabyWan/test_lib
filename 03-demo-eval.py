@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelEncoder
 from phaser.utils import load_labelencoders
 
+plt.style.use('dark_background')
+#plt.style.use('default')
+
 label_encoders = load_labelencoders(
     ["le_f", "le_a", "le_t", "le_m"], path="./demo_outputs/"
 )
@@ -39,11 +42,11 @@ t_str = "Border_bw30_bc255.0.0"
 
 # Plot for INTER (within images)
 fig = histogram_fig(intra_df, le_a, le_m, t_str)
-fig.savefig(fname=f"./demo_outputs/FIG_intra_df_{t_str}.png")
+fig.savefig(fname=f"./demo_outputs/FIG_intra_df_{t_str}.pdf")
 
 # Plot for INTRA (between images)
 fig = histogram_fig(inter_df, le_a, le_m, t_str)
-fig.savefig(fname=f"./demo_outputs/FIG_inter_df_{t_str}.png")
+fig.savefig(fname=f"./demo_outputs/FIG_inter_df_{t_str}.pdf")
 
 ##################
 # MACRO ANALYSIS #
@@ -69,7 +72,7 @@ fig, ax = plt.subplots(ncols=1, nrows=1, figsize=FIGSIZE, constrained_layout=Tru
 ax = kde_distributions_ax(
     data, t_str, le_c, fill=True, title=f"{a_str} - {m_str} - {t_str}", ax=ax
 )
-fig.savefig(fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_kde_distributions.png")
+fig.savefig(fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_kde_distributions.pdf")
 
 # get similarities and true class labels
 y_true = data["class"]
@@ -92,7 +95,7 @@ print(f"Plotting CM using EER@{mm.eer_thresh=:.4f} & {mm.eer_score=:.4f}")
 fig, ax = plt.subplots(ncols=1, nrows=1, figsize=FIGSIZE, constrained_layout=True)
 ax = cm_ax(cm=cm_eer, class_labels=le_c.classes_, values_format=".0f", ax=ax)
 fig.savefig(
-    fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_cm_@{mm.eer_thresh:.4f}.png"
+    fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_cm_@{mm.eer_thresh:.4f}.pdf"
 )
 
 # Plot EER curve
@@ -115,14 +118,14 @@ _ = ax.axvline(
 ax = eer_ax(
     mm.fpr, mm.tpr, mm.thresholds, decision_thresh=mm.eer_thresh, legend=f"", ax=ax
 )
-fig.savefig(fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_EER_curve.png")
+fig.savefig(fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_EER_curve.pdf")
 
 # CM using max_fpr
 print(f"Plotting CM using {max_fpr=}")
 fig, ax = plt.subplots(ncols=1, nrows=1, figsize=FIGSIZE, constrained_layout=True)
 ax = cm_ax(cm_fpr, class_labels=le_c.classes_, values_format=".0f", ax=ax)
 fig.savefig(
-    fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_cm_@{fpr_threshold:.4f}.png"
+    fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_cm_@{fpr_threshold:.4f}.pdf"
 )
 
 # ROC curve
@@ -131,4 +134,4 @@ from phaser.plotting import roc_ax
 print(f"Plotting ROC curve")
 fig, ax = plt.subplots(ncols=1, nrows=1, figsize=FIGSIZE, constrained_layout=True)
 ax = roc_ax(mm.fpr, mm.tpr, roc_auc=mm.auc, legend=f"{a_str}_{m_str}_{t_str}", ax=ax)
-fig.savefig(fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_ROC_AUC{mm.auc:.4f}.png")
+fig.savefig(fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_ROC_AUC{mm.auc:.4f}.pdf")
