@@ -21,8 +21,8 @@ algorithms = {"phash": PHash(hash_size=8, highfreq_factor=4), "colour": ColourHa
 from phaser.transformers import Border, Flip
 
 transformers = [
-    Border(border_color=(255, 0, 0), border_width=30, saveToPath=""),
-    Flip(direction="Horizontal", saveToPath=""),
+    Border(border_colour=(255, 0, 0), border_width=30, saveToDir=""),
+    Flip(direction="Horizontal", saveToDir=""),
 ]
 
 ch = ComputeHashes(algorithms, transformers, n_jobs=-1, progress_bar=True)

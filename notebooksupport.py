@@ -32,8 +32,9 @@ def list_modular_components():
     for name in dir(phaser.transformers):
         try:
             if issubclass(getattr(phaser.transformers, name), phaser.transformers.Transformer):
-                transformers.append(name)
-        except TypeError as err:
+                if name != "Transformer":
+                    transformers.append(name)
+        except TypeError:
             pass
 
     builtin_distance_metrics = scipy.spatial.distance._METRICS_NAMES# Not sure there's a better way to get these.
