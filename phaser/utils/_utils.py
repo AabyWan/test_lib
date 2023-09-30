@@ -8,7 +8,7 @@ class ImageLoader():
         # do not use path.name since it depends on the path being WindowsPath etc.
         # instead, convert the path to a string value
         self.path = str(path)
-        self.filename = self.path.split(os.sep)[-1]
+        self.filename = os.path.basename(self.path)
         
         # load the image from the provided path
         self.image = Image.open(path)

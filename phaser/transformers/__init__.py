@@ -11,7 +11,7 @@ from ._transforms import (
     Rescale,
     Rotate,
     TransformFromDisk,
-    Watermark
+    Watermark,
 )
 
 __all__ = [
@@ -23,5 +23,5 @@ __all__ = [
     "Rescale",
     "Rotate",
     "TransformFromDisk",
-    "Watermark"
+    "Watermark",
 ]
