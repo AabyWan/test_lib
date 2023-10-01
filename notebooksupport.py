@@ -94,8 +94,9 @@ def calculate_distances(hash_directory:str, distance_metrics:list, progress_repo
     # Get the unique values and set constants
     ALGORITHMS = le_a.classes_
     TRANSFORMS = le_t.classes_
-    print(f"{ALGORITHMS=}")
-    print(f"{TRANSFORMS=}")
+
+    print(f"Algorithms: \t {', '.join(ALGORITHMS)}")
+    print(f"Transforms: \t {', '.join(TRANSFORMS)}")
 
     # Convert binary hashes to boolean
     for a in ALGORITHMS:
@@ -108,7 +109,7 @@ def calculate_distances(hash_directory:str, distance_metrics:list, progress_repo
     le_m = LabelEncoder().fit(list(distance_metrics.keys()))
 
     METRICS = le_m.classes_
-    print(f"{METRICS=}")
+    print(f"Metrics: \t {', '.join(METRICS)}")
 
     # Dump metric LabelEncoder
     print(f"Saving metric encoder to le_m.")
@@ -126,8 +127,8 @@ def calculate_distances(hash_directory:str, distance_metrics:list, progress_repo
     inter = InterDistance(le_t, le_m, le_a, distance_metrics=distance_metrics, set_class=0, n_samples=n_samples, progress_bar=True)
     inter_df = inter.fit(df)
 
-    print(f"Number of pairwise comparisons = {inter.n_pairs_}")
-    print(f"Number of inter distances = {len(inter_df)}")
+    print(f"Number of pairwise comparisons per triplet (algo., trans., metric) = {inter.n_pairs_}")
+    print(f"Total number of inter-distance observations = {len(inter_df)}")
 
     # Combine distances and save to disk
     dist_df = pd.concat([intra_df,inter_df])

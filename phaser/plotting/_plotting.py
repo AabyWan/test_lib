@@ -8,7 +8,7 @@ import seaborn as sns
 from sklearn.metrics import ConfusionMatrixDisplay
 
 
-def histogram_fig(data, le_a, le_m, transform, figsize=(5,5)):
+def histogram_fig(data, le_a, le_m, transform, figsize=(5,5), interactive=False):
     _m = le_m.classes_
     _a = le_a.classes_
 
@@ -38,13 +38,14 @@ def histogram_fig(data, le_a, le_m, transform, figsize=(5,5)):
     
     # Close the figure for memory management and to avoid it showing on return
     _ = plt.suptitle(f"Transformation = {transform.capitalize()}")
-    plt.close()
+    if not interactive:
+        plt.close()
     
     return fig
 
 def kde_distributions_ax(data, transform, le_c, annotate=True, fill=False, threshold=None, title='', ax=None):
     # Create an axis if none is provided
-    if ax == None : ax = plt.gca()
+    if type(ax) == None : ax = plt.gca()
     
     # Copy to avoid overwriting original numeric class in provided data
     _data = data.copy()

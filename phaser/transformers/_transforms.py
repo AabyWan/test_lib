@@ -440,7 +440,7 @@ class Watermark(Transformer):
 
         super().__init__(name=name, saveToDir=saveToDir, saveToSubDir=saveToSubdir)
         if not self.name:
-            self.name = f"Waternmark"
+            self.name = f"Watermark"
         self.height_factor = image_height_factor
         self.minheight = minheight
 

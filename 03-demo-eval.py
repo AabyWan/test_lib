@@ -59,7 +59,6 @@ a_str = "pHash"
 
 # Convert to labels
 m_label = le_m.transform(np.array(m_str).ravel())
-print(m_label)
 a_label = le_a.transform(np.array(a_str).ravel())
 
 # Subset data
