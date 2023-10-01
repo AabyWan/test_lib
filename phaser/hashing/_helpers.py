@@ -7,7 +7,6 @@ from tqdm import tqdm
 ## Local imports from ..utils
 from ..utils import ImageLoader
 
-
 class ComputeHashes:
     """Compute Perceptual Hashes using a defined dictionary of algorithms, \\
         and a corresponding list for transformations to be applies

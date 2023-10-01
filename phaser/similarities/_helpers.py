@@ -2,17 +2,16 @@ import numpy as np
 import pandas as pd
 import phaser.similarities
 from scipy.spatial import distance as dist
+from scipy.spatial.distance import cdist, pdist
 from itertools import combinations
 from tqdm import tqdm
 from typing import Callable
-
 
 def find_inter_samplesize(num_images: int) -> int:
     for n in range(0, num_images):
         if (n * (n - 1)) / 2 > num_images:
             return n
     return 0
-
 
 def validate_metrics(metrics: dict) -> bool:
     """Function to perform light validation of metrics.
@@ -27,7 +26,7 @@ def validate_metrics(metrics: dict) -> bool:
 
     for mname, value in metrics.items():
         if isinstance(value, str):
-            if value not in dist._METRICS_NAMES:
+            if value not in dist._METRICS_NAMES: #type:ignore
                 invalid.append(
                     f"{mname} does not match the name of a distance metric in scipy.spatial.distance."
                 )
@@ -50,38 +49,29 @@ def validate_metrics(metrics: dict) -> bool:
         message = f"Invalid metrics found:{invalid}"
         raise (Exception(message))
 
-
 # DISTANCE COMPUTATION
 class IntraDistance:
     def __init__(
-        self, le_t, le_m, le_a, distance_metrics={}, set_class=0, progress_bar=False
-    ):
-        """_summary_
-
-        Parameters
-        ----------
-        le_t : sklearn.preprocessing.LabelEncoder
-            _description_
-
-        le_m : sklearn.preprocessing.LabelEncoder
-            _description_
-
-        le_a : sklearn.preprocessing.LabelEncoder
-            _description_
-
-        set_class : int, optional
-            _description_, by default 0
-        """
+        self, 
+        le_t, 
+        le_m, 
+        le_a, 
+        dist_w=None, # would expect a dicitonary
+        distance_metrics={}, 
+        set_class=0, 
+        progress_bar=False):
+        # 
         self.le_t = le_t
         self.le_m = le_m
         self.le_a = le_a
+        self.dist_w = dist_w
         self.distance_metrics = distance_metrics
         self.set_class = set_class
         self.progress_bar = progress_bar
 
-        validate_metrics(self.distance_metrics)
+        #validate_metrics(self.distance_metrics)
 
-    def intradistance(self, x, algorithm, metric):
+    def intradistance(self, x, algorithm, metric, weights):
         # store the first hash and reshape into 2d array as required by cdist func.
         xa = x[algorithm].iloc[0].reshape(1, -1)
 
@@ -93,8 +83,8 @@ class IntraDistance:
         # This is either a string representing a name from scipy.spatial.distances
         # or a callable function implementing another metric.
         metric_value = self.distance_metrics[metric]
-
-        return dist.cdist(xa, xb, metric=metric_value)
+        
+        return cdist(xa, xb, metric=metric_value, w=weights)
 
     def fit(self, data):
         self.files_ = data["filename"].unique()
@@ -104,10 +94,17 @@ class IntraDistance:
 
         for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, desc="Hash"):
             for m in self.le_m.classes_:
-
+                
+                if self.dist_w:
+                    w = self.dist_w[f"{a}_{m}"]
+                else: w=None
+                
                 # Compute the distances for each filename
                 grp_dists = data.groupby(["filename"]).apply(
-                    func=self.intradistance, algorithm=a, metric=m
+                    self.intradistance, 
+                    algorithm=a, 
+                    metric=m,
+                    weights=w
                 )
 
                 # Stack each distance into rows
@@ -153,6 +150,7 @@ class InterDistance:
         le_t,
         le_m,
         le_a,
+        dist_w=None,
         distance_metrics={},
         set_class=1,
         n_samples=100,
@@ -162,15 +160,16 @@ class InterDistance:
         self.le_t = le_t
         self.le_m = le_m
         self.le_a = le_a
+        self.dist_w = dist_w
         self.distance_metrics = distance_metrics
         self.set_class = set_class
         self.n_samples = n_samples
         self.random_state = random_state
         self.progress_bar = progress_bar
 
-        validate_metrics(self.distance_metrics)
+        #validate_metrics(self.distance_metrics)
 
-    def interdistance(self, x, algorithm, metric):
+    def interdistance(self, x, algorithm, metric, weights):
         # get hashes into a 2d array
         hashes = np.row_stack(x[algorithm])
 
@@ -180,7 +179,7 @@ class InterDistance:
         metric_value = self.distance_metrics[metric]
 
         # return pairwise distances of all combinations
-        return dist.pdist(hashes, metric_value)
+        return pdist(hashes, metric_value, w=weights)
 
     def fit(self, data):
         # Get the label used to encode 'orig'
@@ -213,11 +212,17 @@ class InterDistance:
         # Do the math using Pandas groupby
         for a in tqdm(self.le_a.classes_, disable=not self.progress_bar, desc="Hash"):
             for m in self.le_m.classes_:
+
+                if self.dist_w:
+                    w = self.dist_w[f"{a}_{m}"]
+                else: w=None
+                
                 # Compute distances for each group of transformations
                 grp_dists = subset.groupby(["transformation"]).apply(
                     self.interdistance,  # type:ignore
                     algorithm=a,
                     metric=m,
+                    weights=w
                 )
 
                 # Transpose to create rows of observations

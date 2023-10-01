@@ -1,34 +1,37 @@
 import pathlib, os
-
-pathlib.Path("./demo_outputs").mkdir(exist_ok=True)
-
+from sklearn.preprocessing import LabelEncoder
 from phaser.utils import ImageLoader as IL
 from phaser.utils import dump_labelencoders
-from phaser.hashing import PHASH
+from phaser.hashing import ComputeHashes, PHASH, ColourHash, PdqHash
+from phaser.transformers import Border, Flip
 
 print("Running script.")
 script_dir = f"{os.sep}".join(os.path.abspath(__file__).split(os.sep)[:-1])
-print(script_dir)
+script_dir = f"C:/Users/aabywan/Downloads/Flickr_8k"
+# Change to scrip_dir if required.
+os.chdir(script_dir)
+# Make folder for outputs if not already there.
+pathlib.Path("./demo_outputs").mkdir(exist_ok=True)
 
-IMGPATH = os.path.join(script_dir, "images")
+IMGPATH = os.path.join(script_dir, "Images")
 
-list_of_images = [str(i) for i in pathlib.Path(IMGPATH).glob("**/*")]
-
-from phaser.hashing import ComputeHashes, PHASH, ColourHash
-
-algorithms = {"phash": PHASH(hash_size=8, highfreq_factor=4), "colour": ColourHash()}
-
-from phaser.transformers import Border, Flip
-
-transformers = [
+ALGOS = {
+    "phash":  PHASH(hash_size=8), 
+    "colour": ColourHash(),
+    "pdq":    PdqHash()
+    }
+TRANS = [
+    Border(border_color=(255, 0, 0), border_width=20, saveToPath=""),
     Border(border_color=(255, 0, 0), border_width=30, saveToPath=""),
-    Flip(direction="Horizontal", saveToPath=""),
-]
+    Flip(direction="Horizontal", saveToPath="")]
 
-ch = ComputeHashes(algorithms, transformers, n_jobs=-1)
+# Prepare for parallel processing
+ch = ComputeHashes(ALGOS, TRANS, n_jobs=-1, progress_bar=True)
+
+# Find all the images
+list_of_images = [str(i) for i in pathlib.Path(IMGPATH).glob("**/*")]
+# Hash all images
 df = ch.fit(list_of_images)
-
-from sklearn.preprocessing import LabelEncoder
 
 # Create label encoders
 le_f = LabelEncoder()
@@ -38,7 +41,7 @@ le_t = LabelEncoder()
 le_t = le_t.fit(df["transformation"])
 
 le_a = LabelEncoder()
-le_a = le_a.fit(list(algorithms.keys()))
+le_a = le_a.fit(list(ALGOS.keys()))
 
 # Apply LabelEncoders to data
 df["filename"] = le_f.transform(df["filename"])
@@ -50,9 +53,12 @@ dump_labelencoders({"le_f": le_f, "le_a": le_a, "le_t": le_t}, path="./demo_outp
 # Dump the dataset
 print(f"{os.getcwd()=}")
 compression_opts = dict(method="bz2", compresslevel=9)
+
 df.to_csv(
     "./demo_outputs/hashes.csv.bz2",
     index=False,
     encoding="utf-8",
     compression=compression_opts,
 )
+
+print(f"Script completed")

@@ -1,6 +1,13 @@
 import pandas as pd
+import os
 from sklearn.preprocessing import LabelEncoder
 from phaser.utils import dump_labelencoders, load_labelencoders, bin2bool
+
+print("Running script.")
+script_dir = f"{os.sep}".join(os.path.abspath(__file__).split(os.sep)[:-1])
+script_dir = f"C:/Users/aabywan/Downloads/Flickr_8k"
+# Change to scrip_dir if required.
+os.chdir(script_dir)
 
 # Read the precomputed hashes
 df = pd.read_csv("./demo_outputs/hashes.csv.bz2")
@@ -12,6 +19,7 @@ le_f, le_a, le_t = label_encoders.values()
 # Get the unique values and set constants
 ALGORITHMS = le_a.classes_
 TRANSFORMS = le_t.classes_
+
 print(f"{ALGORITHMS=}")
 print(f"{TRANSFORMS=}")
 
@@ -19,7 +27,7 @@ print(f"{TRANSFORMS=}")
 for a in ALGORITHMS:
     df[a] = df[a].apply(bin2bool)  # type:ignore
 
-from phaser.similarities import test_synthetic
+#from phaser.similarities import test_synthetic
 
 # Specify Distance Algorithms
 # If the distance metric is part of scipy.spatial.distance, specify the name as a string
@@ -27,7 +35,7 @@ from phaser.similarities import test_synthetic
 distance_metrics = {
     "Hamming": "hamming",
     "Cosine": "cosine",
-    "Test_Synthetic": test_synthetic,
+#    "Test_Synthetic": test_synthetic,
 }
 
 # Configure metric LabelEncoder
@@ -75,3 +83,5 @@ dist_df.to_csv(
     encoding="utf-8",
     compression=compression_opts,
 )
+
+print(f"Script completed")

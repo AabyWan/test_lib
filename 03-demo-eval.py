@@ -1,133 +1,136 @@
 import numpy as np
 import pandas as pd
+import os
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import LabelEncoder
-from phaser.utils import load_labelencoders
 
-label_encoders = load_labelencoders(
-    ["le_f", "le_a", "le_t", "le_m"], path="./demo_outputs/"
-)
+from sklearn.preprocessing import LabelEncoder
+
+from phaser.utils import load_labelencoders, bin2bool
+from phaser.evaluation import ComputeMetrics
+from phaser.similarities import IntraDistance, InterDistance
+
+print("Running script.")
+script_dir = f"{os.sep}".join(os.path.abspath(__file__).split(os.sep)[:-1])
+script_dir = f"C:/Users/aabywan/Downloads/Flickr_8k"
+# Change to scrip_dir if required.
+os.chdir(script_dir)
+
+# Load the label encoders
+label_encoders = load_labelencoders(["le_f","le_a","le_t","le_m"], path="./demo_outputs/")
 le_f, le_a, le_t, le_m = label_encoders.values()
 
 TRANSFORMS = le_t.classes_
-METRICS = le_m.classes_
+METRICS    = le_m.classes_
 ALGORITHMS = le_a.classes_
+FIGSIZE    = (5, 3)
 
-df = pd.read_csv("./demo_outputs/distances.csv.bz2")
+print(f"Algorithms available\n{np.column_stack([np.arange(0,len(ALGORITHMS),1), ALGORITHMS])}\n")
+print(f"Transformations available\n{np.column_stack([np.arange(0,len(TRANSFORMS),1), TRANSFORMS])}\n")
+print(f"Metrics available\n{np.column_stack([np.arange(0,len(METRICS),1), METRICS])}\n")
 
-# Split into intra and inter for stats
-intra_df = df[df["class"] == 1]
-inter_df = df[df["class"] == 0]
+df_d = pd.read_csv("./demo_outputs/distances.csv.bz2")
+df_h = pd.read_csv("./demo_outputs/hashes.csv.bz2")
+
+# convert the strings to arrays
+for _a in ALGORITHMS:
+    df_h[_a] = df_h[_a].apply(bin2bool)
 
 # Create a label encoder for the class labels
 le_c = LabelEncoder()
-le_c.classes_ = np.array(["Inter (0)", "Intra (1)"])
+le_c.classes_ = np.array(['Inter (0)','Intra (1)'])
 
-from phaser.evaluation import macro_stats
+all_the_bits = {}
+evaluation_results = []
 
-for transform in TRANSFORMS[:-1]:
-    print(f"\nGenerating macro stats for '{transform}'")
-    stats = macro_stats(
-        data=intra_df, le_a=le_a, le_m=le_m, transform=transform, style=False
-    )
-    print(stats.to_latex())
+triplets = np.array(np.meshgrid(
+    ALGORITHMS, 
+    TRANSFORMS[:-1], 
+    METRICS)).T.reshape(-1,3)
 
-from phaser.plotting import histogram_fig
+print(f"Number of triplets to analyse: {len(triplets)}")
 
-# Select a specific transform to plot
-t_str = "Border_bw30_bc255.0.0"
+cm = ComputeMetrics(le_f, le_a, le_t, le_m, df_d, df_h, analyse_bits=True, n_jobs=-1, progress_bar=True)
+metrics, bitfreq = cm.fit(triplets=triplets, weighted=False)
+print(f"Performance wihtout applying bitweights:")
+print(metrics)
 
-# Plot for INTER (within images)
-fig = histogram_fig(intra_df, le_a, le_m, t_str)
-fig.savefig(fname=f"./demo_outputs/FIG_intra_df_{t_str}.png")
+# Create mean bitweights
+mean_weights = {}
 
-# Plot for INTRA (between images)
-fig = histogram_fig(inter_df, le_a, le_m, t_str)
-fig.savefig(fname=f"./demo_outputs/FIG_inter_df_{t_str}.png")
+for a in ALGORITHMS:
+    for m in METRICS:
+        # Aggregate weights across different transforms
+        pair = f"{a}_{m}"
+        _weights = []
 
-##################
-# MACRO ANALYSIS #
-##################
+        for t in TRANSFORMS:
+            if t == 'orig' : continue
+            bits = bitfreq[f"{a}_{t}_{m}"]
+            means = bits.T.mean().values 
+            _weights.append(means)
+        mean_weights[pair] = np.mean(_weights, axis=0)
+        del _weights
 
-FIGSIZE = (5, 3)
-# Select a specific metric and hashing algorithm
-m_str = "hamming"
-a_str = "phash"
+distance_metrics = {"Hamming": "hamming", "Cosine": "cosine"}
 
-# Convert to labels
-m_label = le_m.transform(np.array(m_str).ravel())
-a_label = le_a.transform(np.array(a_str).ravel())
+# compute all distances using the new bitweights!
+intra = IntraDistance(
+    le_t=le_t,
+    le_m=le_m,
+    le_a=le_a,
+    dist_w=mean_weights, # weighted distances!!!
+    distance_metrics=distance_metrics,
+    set_class=1,
+    progress_bar=True)
+intra_df = intra.fit(df_h)
 
-# Subset data
-data = df.query(f"algo == {a_label} and metric == {m_label}").copy()
+from phaser.similarities import find_inter_samplesize
+# Compute the inter distances using subsampling
+n_samples = find_inter_samplesize(len(df_h["filename"].unique() * 1))
 
-# KDE plot
-from phaser.plotting import kde_distributions_ax
+inter = InterDistance(
+    le_t,
+    le_m,
+    le_a,
+    dist_w=mean_weights, # weighted distances!!!
+    distance_metrics=distance_metrics,
+    set_class=0,
+    n_samples=n_samples,
+    progress_bar=True)
+inter_df = inter.fit(df_h)
 
-fig, ax = plt.subplots(ncols=1, nrows=1, figsize=FIGSIZE, constrained_layout=True)
-ax = kde_distributions_ax(
-    data, t_str, le_c, fill=True, title=f"{a_str} - {m_str} - {t_str}", ax=ax
-)
-fig.savefig(fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_kde_distributions.png")
+df_d_w = pd.concat([intra_df, inter_df])
 
-# get similarities and true class labels
-y_true = data["class"]
-y_similarity = data[t_str]
+# recompute metrics with weighted distances. No need to analyse bits again !?
+cm = ComputeMetrics(le_f, le_a, le_t, le_m, df_d_w, df_h, analyse_bits=False, n_jobs=-1, progress_bar=True)
+metrics_w, _ = cm.fit(triplets=triplets, weighted=False)
 
-# Prepare metrics for plotting EER and AUC
-from phaser.evaluation import MetricMaker
+print(f"Performance WITH applying bitweights:")
+print(metrics_w)
 
-mm = MetricMaker(y_true=y_true, y_similarity=y_similarity, weighted=False)
-mm.eer()
+# Do a quick plot 
+import seaborn as sns
+dist_metric='Cosine'
+#dist_metric='Hamming'
+fig, ax = plt.subplots(1,2,figsize=(8,3), constrained_layout=True, sharex=True, sharey=True)
+_ = sns.barplot(
+    data=metrics[metrics['Metric'] == dist_metric], #type:ignore
+    x='Algorithm', 
+    y='AUC', 
+    hue='Transform',
+    ax=ax[0])
 
-# Make predictions and compute cm using EER
-cm_eer = mm.get_cm(decision_threshold=mm.eer_thresh, normalize=None)  # type:ignore
+_ = sns.barplot(
+    data=metrics_w[metrics_w['Metric'] == dist_metric], #type:ignore
+    x='Algorithm', 
+    y='AUC', 
+    hue='Transform',
+    ax=ax[1])
 
-# Plot CM using EER threshold
-
-from phaser.plotting import cm_ax
-
-print(f"Plotting CM using EER@{mm.eer_thresh=:.4f} & {mm.eer_score=:.4f}")
-fig, ax = plt.subplots(ncols=1, nrows=1, figsize=FIGSIZE, constrained_layout=True)
-ax = cm_ax(cm=cm_eer, class_labels=le_c.classes_, values_format=".0f", ax=ax)
-fig.savefig(
-    fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_cm_@{mm.eer_thresh:.4f}.png"
-)
-
-# Plot EER curve
-from phaser.plotting import eer_ax
-
-print(f"Plotting EER curve and finding max FPR threshold")
-fig, ax = plt.subplots(ncols=1, nrows=1, figsize=FIGSIZE, constrained_layout=True)
-
-max_fpr = 0.05
-fpr_threshold = mm.get_fpr_threshold(max_fpr=max_fpr)
-cm_fpr = mm.get_cm(fpr_threshold, normalize="none")
-print(f"{max_fpr=} -> {fpr_threshold=:.4f}")
-_ = ax.axhline(max_fpr, label=f"FPR={max_fpr:.2f}", color="red")
-_ = ax.axvline(
-    float(fpr_threshold),
-    label=f"FPR={max_fpr:.2f}@{fpr_threshold:.2f}",
-    color="red",
-    linestyle="--",
-)
-ax = eer_ax(
-    mm.fpr, mm.tpr, mm.thresholds, decision_thresh=mm.eer_thresh, legend=f"", ax=ax
-)
-fig.savefig(fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_EER_curve.png")
-
-# CM using max_fpr
-print(f"Plotting CM using {max_fpr=}")
-fig, ax = plt.subplots(ncols=1, nrows=1, figsize=FIGSIZE, constrained_layout=True)
-ax = cm_ax(cm_fpr, class_labels=le_c.classes_, values_format=".0f", ax=ax)
-fig.savefig(
-    fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_cm_@{fpr_threshold:.4f}.png"
-)
-
-# ROC curve
-from phaser.plotting import roc_ax
-
-print(f"Plotting ROC curve")
-fig, ax = plt.subplots(ncols=1, nrows=1, figsize=FIGSIZE, constrained_layout=True)
-ax = roc_ax(mm.fpr, mm.tpr, roc_auc=mm.auc, legend=f"{a_str}_{m_str}_{t_str}", ax=ax)
-fig.savefig(fname=f"./demo_outputs/FIG_{a_str}_{m_str}_{t_str}_ROC_AUC{mm.auc:.4f}.png")
+#_ = ax.grid(axis='y', alpha=.25)
+_ = ax[0].legend(loc='lower right')
+_ = ax[1].legend(loc='lower right')
+_ = ax[0].set(title=f"'{dist_metric}' $without$ bit-weighting")
+_ = ax[1].set(title=f"'{dist_metric}' $with$ bit-weighting")
+fig.savefig("./demo_outputs/03_weight_impact.png")
+plt.close()
