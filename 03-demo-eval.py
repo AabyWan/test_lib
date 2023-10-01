@@ -16,12 +16,11 @@ script_dir = f"C:/Users/aabywan/Downloads/Flickr_8k"
 os.chdir(script_dir)
 
 # Load the label encoders
-label_encoders = load_labelencoders(["le_f","le_a","le_t","le_m"], path="./demo_outputs/")
-le_f, le_a, le_t, le_m = label_encoders.values()
+le = load_labelencoders(filename="LabelEncoders", path="./demo_outputs/")
 
-TRANSFORMS = le_t.classes_
-METRICS    = le_m.classes_
-ALGORITHMS = le_a.classes_
+TRANSFORMS = le['t'].classes_
+METRICS    = le['m'].classes_
+ALGORITHMS = le['a'].classes_
 FIGSIZE    = (5, 3)
 
 print(f"Algorithms available\n{np.column_stack([np.arange(0,len(ALGORITHMS),1), ALGORITHMS])}\n")
@@ -36,8 +35,8 @@ for _a in ALGORITHMS:
     df_h[_a] = df_h[_a].apply(bin2bool)
 
 # Create a label encoder for the class labels
-le_c = LabelEncoder()
-le_c.classes_ = np.array(['Inter (0)','Intra (1)'])
+le['c'] = LabelEncoder()
+le['c'].classes_ = np.array(['Inter (0)','Intra (1)'])
 
 all_the_bits = {}
 evaluation_results = []
@@ -49,7 +48,7 @@ triplets = np.array(np.meshgrid(
 
 print(f"Number of triplets to analyse: {len(triplets)}")
 
-cm = ComputeMetrics(le_f, le_a, le_t, le_m, df_d, df_h, analyse_bits=True, n_jobs=-1, progress_bar=True)
+cm = ComputeMetrics(le, df_d, df_h, analyse_bits=True, n_jobs=-1, progress_bar=True)
 metrics, bitfreq = cm.fit(triplets=triplets, weighted=False)
 print(f"Performance wihtout applying bitweights:")
 print(metrics)
@@ -75,9 +74,7 @@ distance_metrics = {"Hamming": "hamming", "Cosine": "cosine"}
 
 # compute all distances using the new bitweights!
 intra = IntraDistance(
-    le_t=le_t,
-    le_m=le_m,
-    le_a=le_a,
+    le=le,
     dist_w=mean_weights, # weighted distances!!!
     distance_metrics=distance_metrics,
     set_class=1,
@@ -89,9 +86,7 @@ from phaser.similarities import find_inter_samplesize
 n_samples = find_inter_samplesize(len(df_h["filename"].unique() * 1))
 
 inter = InterDistance(
-    le_t,
-    le_m,
-    le_a,
+    le=le,
     dist_w=mean_weights, # weighted distances!!!
     distance_metrics=distance_metrics,
     set_class=0,
@@ -102,7 +97,7 @@ inter_df = inter.fit(df_h)
 df_d_w = pd.concat([intra_df, inter_df])
 
 # recompute metrics with weighted distances. No need to analyse bits again !?
-cm = ComputeMetrics(le_f, le_a, le_t, le_m, df_d_w, df_h, analyse_bits=False, n_jobs=-1, progress_bar=True)
+cm = ComputeMetrics(le, df_d_w, df_h, analyse_bits=False, n_jobs=-1, progress_bar=True)
 metrics_w, _ = cm.fit(triplets=triplets, weighted=False)
 
 print(f"Performance WITH applying bitweights:")

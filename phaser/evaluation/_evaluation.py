@@ -245,17 +245,15 @@ class BitAnalyzer:
 # Create a wrapper parallel metrics
 class ComputeMetrics:
     def __init__(
-        self, le_f, le_a, le_t, le_m,
+        self, 
+        le,
         df_d, df_h,
         analyse_bits: bool,
         n_jobs=1,
         backend="loky",
         progress_bar=False,
     ) -> None:
-        self.le_f = le_f
-        self.le_a = le_a
-        self.le_t = le_t
-        self.le_m = le_m
+        self.le = le
         self.df_d = df_d
         self.df_h = df_h
         self.analyse_bits = analyse_bits
@@ -267,9 +265,9 @@ class ComputeMetrics:
         a_s, t_s, m_s = triplet
 
         # from string to integer label encoding
-        a_l = self.le_a.transform(np.array(a_s).ravel())[0]
-        t_l = self.le_t.transform(np.array(t_s).ravel())[0]
-        m_l = self.le_m.transform(np.array(m_s).ravel())[0]
+        a_l = self.le['a'].transform(np.array(a_s).ravel())[0]
+        t_l = self.le['t'].transform(np.array(t_s).ravel())[0]
+        m_l = self.le['m'].transform(np.array(m_s).ravel())[0]
 
         # subset the triplet data
         subset = self.df_d[
@@ -286,7 +284,7 @@ class ComputeMetrics:
             breakdown=True)
 
         if self.analyse_bits:
-            BA = BitAnalyzer(df_h=self.df_h, le_t=self.le_t)
+            BA = BitAnalyzer(df_h=self.df_h, le_t=self.le['t'])
 
             # BA.fit() -> pd.DataFrame
             bits = BA.fit(subset=subset, y_pred=mm.y_pred, t_l=t_l, a_s=a_s)
