@@ -1,4 +1,5 @@
 from paper01_conf import *
+
 from phaser.hashing import PHash, ColourHash, PdqHash, ComputeHashes
 from phaser.transformers import Border, Flip
 from phaser.utils import dump_labelencoders
@@ -11,6 +12,7 @@ TRANS = [
     Border(border_colour=(255, 0, 0), border_width=20, saveToDir=""),
     Border(border_colour=(255, 0, 0), border_width=30, saveToDir=""),
     Flip(direction="Horizontal", saveToDir=""),
+
 ]
 
 # Prepare for parallel processing

@@ -9,6 +9,7 @@ from tqdm.auto import tqdm
 from typing import Callable
 
 
+
 pathlib.Path("./logs").mkdir(exist_ok=True)
 logging.basicConfig(
     filename="./logs/process.log",
@@ -25,7 +26,6 @@ def find_inter_samplesize(num_images: int) -> int:
             return n
     return 0
 
-
 def validate_metrics(metrics: dict) -> bool:
     """Function to perform light validation of metrics.
     If the distance provided is a string, it should be in scipy.spatial.distance.
@@ -39,7 +39,7 @@ def validate_metrics(metrics: dict) -> bool:
 
     for mname, value in metrics.items():
         if isinstance(value, str):
-            if value not in dist._METRICS_NAMES:
+            if value not in dist._METRICS_NAMES: #type:ignore
                 invalid.append(
                     f"{mname} does not match the name of a distance metric in scipy.spatial.distance."
                 )
@@ -58,7 +58,6 @@ def validate_metrics(metrics: dict) -> bool:
         # There are invalid objects, avoid running the tests.
         message = f"Invalid metrics found:{invalid}"
         raise (Exception(message))
-
 
 # DISTANCE COMPUTATION
 class IntraDistance:
