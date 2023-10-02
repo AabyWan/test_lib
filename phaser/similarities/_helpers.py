@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from ._distances import DISTANCE_METRICS
 from scipy.spatial import distance as dist
+from scipy.spatial.distance import cdist, pdist
 from itertools import combinations
 from tqdm.auto import tqdm
 from typing import Callable
@@ -62,34 +63,22 @@ def validate_metrics(metrics: dict) -> bool:
 # DISTANCE COMPUTATION
 class IntraDistance:
     def __init__(
-        self, le_t, le_m, le_a, distance_metrics={}, set_class=0, progress_bar=False
-    ):
-        """_summary_
-
-        Parameters
-        ----------
-        le_t : sklearn.preprocessing.LabelEncoder
-            _description_
-
-        le_m : sklearn.preprocessing.LabelEncoder
-            _description_
-
-        le_a : sklearn.preprocessing.LabelEncoder
-            _description_
-
-        set_class : int, optional
-            _description_, by default 0
-        """
-        self.le_t = le_t
-        self.le_m = le_m
-        self.le_a = le_a
-        self.distance_metrics = distance_metrics
+        self,
+        m_dict:dict,
+        le:dict, 
+        set_class=0, 
+        bit_weights=None, # would expect a dicitonary
+        progress_bar=False):
+        #
+        self.le = le 
+        self.bit_weights = bit_weights
+        self.m_dict = m_dict
         self.set_class = set_class
         self.progress_bar = progress_bar
 
-        validate_metrics(self.distance_metrics)
+        validate_metrics(self.m_dict)
 
-    def intradistance(self, x, algorithm, metric):
+    def _intradistance(self, x, algorithm, metric, weights):
         # store the first hash and reshape into 2d array as required by cdist func.
         xa = x[algorithm].iloc[0].reshape(1, -1)
 
@@ -100,42 +89,38 @@ class IntraDistance:
         # Get the vlaue corresponding to the metric key.
         # This is either a string representing a name from scipy.spatial.distances
         # or a callable function implementing another metric.
-        metric_value = self.distance_metrics[metric]
-
-        return dist.cdist(xa, xb, metric=metric_value)
+        metric_value = self.m_dict[metric]
+        
+        return cdist(xa, xb, metric=metric_value, w=weights)
 
     def fit(self, data):
         logging.info("===Begin processing Intra-Distance.===")
-
         self.files_ = data["filename"].unique()
         self.n_files_ = len(self.files_)
 
         distances = []
 
-        for a in tqdm(
-            self.le_a.classes_,
-            disable=not self.progress_bar,
-            position=0,
-            desc="Algorithm",
-        ):
-            for m in tqdm(
-                self.le_m.classes_,
-                disable=not self.progress_bar,
-                position=1,
-                leave=False,
-                desc="Metric",
-            ):
+        for a in tqdm(self.le['a'].classes_, disable=not self.progress_bar, desc="Hash"):
+            for m in self.le['m'].classes_:
+                
+                if self.bit_weights:
+                    w = self.bit_weights[f"{a}_{m}"]
+                else: w=None
+                
                 # Compute the distances for each filename
                 grp_dists = data.groupby(["filename"]).apply(
-                    func=self.intradistance, algorithm=a, metric=m
+                    self._intradistance, 
+                    algorithm=a, 
+                    metric=m,
+                    weights=w
                 )
 
                 # Stack each distance into rows
                 grp_dists = np.row_stack(grp_dists)
 
                 # Get the integer labels for algo and metric
-                a_label = self.le_a.transform(a.ravel())[0]
-                m_label = self.le_m.transform(m.ravel())
+                a_label = self.le['a'].transform(a.ravel())[0]
+                m_label = self.le['m'].transform(m.ravel())
 
                 grp_dists = np.column_stack(
                     [
@@ -152,7 +137,7 @@ class IntraDistance:
         distances = np.concatenate(distances)
 
         # Create the dataframe output
-        cols = ["fileA", "fileB", "algo", "metric", "class", *self.le_t.classes_[:-1]]
+        cols = ["fileA", "fileB", "algo", "metric", "class", *self.le['t'].classes_[:-1]]
         distances = pd.DataFrame(distances, columns=cols)
         distances["orig"] = 0
 
@@ -168,49 +153,46 @@ class IntraDistance:
 
         return distances
 
-
 class InterDistance:
     def __init__(
         self,
-        le_t,
-        le_m,
-        le_a,
-        distance_metrics={},
+        m_dict:dict,
+        le:dict,
         set_class=1,
+        bit_weights=None,
         n_samples=100,
         random_state=42,
         progress_bar=False,
     ):
-        self.le_t = le_t
-        self.le_m = le_m
-        self.le_a = le_a
-        self.distance_metrics = distance_metrics
+        self.le = le
+        self.bit_weights = bit_weights
+        self.m_dict = m_dict
         self.set_class = set_class
         self.n_samples = n_samples
         self.random_state = random_state
         self.progress_bar = progress_bar
 
-        validate_metrics(self.distance_metrics)
+        validate_metrics(self.m_dict)
 
-    def interdistance(self, x, algorithm, metric):
+    def _interdistance(self, x, algorithm, metric, weights):
         # get hashes into a 2d array
         hashes = np.row_stack(x[algorithm])
 
         # Get the vlaue corresponding to the metric key.
         # This is either a string representing a name from scipy.spatial.distances
         # or a callable function implementing another metric.
-        metric_value = self.distance_metrics[metric]
+        metric_value = self.m_dict[metric]
 
         # return pairwise distances of all combinations
-        return dist.pdist(hashes, metric_value)
+        return pdist(hashes, metric_value, w=weights)
 
     def fit(self, data):
         logging.info(
             f"===Begin processing Inter-Distance with {self.n_samples} pairwise samples per file.==="
         )
-
+                
         # Get the label used to encode 'orig'
-        orig_label = self.le_t.transform(np.array(["orig"]).ravel())[0]
+        orig_label = self.le['t'].transform(np.array(["orig"]).ravel())[0]
 
         # Assert sufficient data to sample from.
         assert len(data[data["transformation"] == orig_label]) >= self.n_samples
@@ -237,32 +219,27 @@ class InterDistance:
         distances = []
 
         # Do the math using Pandas groupby
-        for a in tqdm(
-            self.le_a.classes_,
-            disable=not self.progress_bar,
-            position=0,
-            desc="Algorithm",
-        ):
-            for m in tqdm(
-                self.le_m.classes_,
-                disable=not self.progress_bar,
-                position=1,
-                leave=False,
-                desc="Metric",
-            ):
+        for a in tqdm(self.le['a'].classes_, disable=not self.progress_bar, desc="Hash"):
+            for m in self.le['m'].classes_:
+
+                if self.bit_weights:
+                    w = self.bit_weights[f"{a}_{m}"]
+                else: w=None
+                
                 # Compute distances for each group of transformations
                 grp_dists = subset.groupby(["transformation"]).apply(
-                    self.interdistance,  # type:ignore
+                    self._interdistance,  # type:ignore
                     algorithm=a,
                     metric=m,
+                    weights=w
                 )
 
                 # Transpose to create rows of observations
                 X_dists = np.transpose(np.row_stack(grp_dists.values))
 
                 # Get the integer labels for algo and metric
-                a_label = self.le_a.transform(a.ravel())[0]
-                m_label = self.le_m.transform(m.ravel())
+                a_label = self.le['a'].transform(a.ravel())[0]
+                m_label = self.le['m'].transform(m.ravel())
 
                 # Add columns with pairs of the compared observations
                 X_dists = np.column_stack(
@@ -282,7 +259,7 @@ class InterDistance:
         distances = np.concatenate(distances)
 
         # Create the dataframe output
-        cols = ["fileA", "fileB", "algo", "metric", "class", *self.le_t.classes_]
+        cols = ["fileA", "fileB", "algo", "metric", "class", *self.le['t'].classes_]
         distances = pd.DataFrame(distances, columns=cols)
 
         # Set datatype to int on all non-distance columns

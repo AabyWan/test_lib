@@ -1,6 +1,7 @@
 .vscode/
 demo_outputs/
 test/
+paper/sample_data/
 *.log
 
 # Byte-compiled / optimized / DLL files
