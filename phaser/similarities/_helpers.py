@@ -35,7 +35,7 @@ def validate_metrics(metrics: dict) -> bool:
         elif isinstance(value, Callable):
             if (
                 value.__name__
-                not in phaser.similarities._distances.__DISTANCE_METRICS__
+                not in phaser.similarities._distances.__m_dict__ #type:ignore
             ):
                 invalid.append(
                     f"{mname} does not appear to be a valid distance function in phaser.similarities"
@@ -53,21 +53,21 @@ def validate_metrics(metrics: dict) -> bool:
 class IntraDistance:
     def __init__(
         self,
-        le, 
-        dist_w=None, # would expect a dicitonary
-        distance_metrics={}, 
+        m_dict:dict,
+        le:dict, 
         set_class=0, 
+        bit_weights=None, # would expect a dicitonary
         progress_bar=False):
         #
         self.le = le 
-        self.dist_w = dist_w
-        self.distance_metrics = distance_metrics
+        self.bit_weights = bit_weights
+        self.m_dict = m_dict
         self.set_class = set_class
         self.progress_bar = progress_bar
 
-        validate_metrics(self.distance_metrics)
+        validate_metrics(self.m_dict)
 
-    def intradistance(self, x, algorithm, metric, weights):
+    def _intradistance(self, x, algorithm, metric, weights):
         # store the first hash and reshape into 2d array as required by cdist func.
         xa = x[algorithm].iloc[0].reshape(1, -1)
 
@@ -78,7 +78,7 @@ class IntraDistance:
         # Get the vlaue corresponding to the metric key.
         # This is either a string representing a name from scipy.spatial.distances
         # or a callable function implementing another metric.
-        metric_value = self.distance_metrics[metric]
+        metric_value = self.m_dict[metric]
         
         return cdist(xa, xb, metric=metric_value, w=weights)
 
@@ -91,13 +91,13 @@ class IntraDistance:
         for a in tqdm(self.le['a'].classes_, disable=not self.progress_bar, desc="Hash"):
             for m in self.le['m'].classes_:
                 
-                if self.dist_w:
-                    w = self.dist_w[f"{a}_{m}"]
+                if self.bit_weights:
+                    w = self.bit_weights[f"{a}_{m}"]
                 else: w=None
                 
                 # Compute the distances for each filename
                 grp_dists = data.groupby(["filename"]).apply(
-                    self.intradistance, 
+                    self._intradistance, 
                     algorithm=a, 
                     metric=m,
                     weights=w
@@ -139,36 +139,35 @@ class IntraDistance:
 
         return distances
 
-
 class InterDistance:
     def __init__(
         self,
-        le,
-        dist_w=None,
-        distance_metrics={},
+        m_dict:dict,
+        le:dict,
         set_class=1,
+        bit_weights=None,
         n_samples=100,
         random_state=42,
         progress_bar=False,
     ):
         self.le = le
-        self.dist_w = dist_w
-        self.distance_metrics = distance_metrics
+        self.bit_weights = bit_weights
+        self.m_dict = m_dict
         self.set_class = set_class
         self.n_samples = n_samples
         self.random_state = random_state
         self.progress_bar = progress_bar
 
-        validate_metrics(self.distance_metrics)
+        validate_metrics(self.m_dict)
 
-    def interdistance(self, x, algorithm, metric, weights):
+    def _interdistance(self, x, algorithm, metric, weights):
         # get hashes into a 2d array
         hashes = np.row_stack(x[algorithm])
 
         # Get the vlaue corresponding to the metric key.
         # This is either a string representing a name from scipy.spatial.distances
         # or a callable function implementing another metric.
-        metric_value = self.distance_metrics[metric]
+        metric_value = self.m_dict[metric]
 
         # return pairwise distances of all combinations
         return pdist(hashes, metric_value, w=weights)
@@ -205,13 +204,13 @@ class InterDistance:
         for a in tqdm(self.le['a'].classes_, disable=not self.progress_bar, desc="Hash"):
             for m in self.le['m'].classes_:
 
-                if self.dist_w:
-                    w = self.dist_w[f"{a}_{m}"]
+                if self.bit_weights:
+                    w = self.bit_weights[f"{a}_{m}"]
                 else: w=None
                 
                 # Compute distances for each group of transformations
                 grp_dists = subset.groupby(["transformation"]).apply(
-                    self.interdistance,  # type:ignore
+                    self._interdistance,  # type:ignore
                     algorithm=a,
                     metric=m,
                     weights=w

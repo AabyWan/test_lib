@@ -8,9 +8,9 @@ import seaborn as sns
 from sklearn.metrics import ConfusionMatrixDisplay
 
 
-def histogram_fig(data, le_a, le_m, transform, figsize=(5,5)):
-    _m = le_m.classes_
-    _a = le_a.classes_
+def hist_fig(data, le, transform, figsize=(5,5)):
+    _m = le['m'].classes_
+    _a = le['a'].classes_
 
     n_cols = len(_m)
     n_rows = len(_a)
@@ -22,8 +22,8 @@ def histogram_fig(data, le_a, le_m, transform, figsize=(5,5)):
     for col_i, metric in enumerate(_m):
         for row_i, algo in enumerate(_a):
             # Transform strings to labels
-            a_label = le_a.transform(np.array(algo).ravel())
-            m_label = le_m.transform(np.array(metric).ravel())
+            a_label = le['a'].transform(np.array(algo).ravel())
+            m_label = le['m'].transform(np.array(metric).ravel())
 
             # Subset data and get the distances for the chosen transformation
             _X = data.query(f"algo=={a_label} and metric == {m_label}")[transform].values
@@ -42,7 +42,20 @@ def histogram_fig(data, le_a, le_m, transform, figsize=(5,5)):
     
     return fig
 
-def kde_distributions_ax(data, transform, le_c, annotate=True, fill=False, threshold=None, title='', ax=None):
+def bit_weights_ax(bits, title="", ax=None):
+    if ax == None: ax = plt.gca()
+    _ = sns.heatmap(
+        data=bits.T, 
+        cmap='Greys', 
+        vmin=0, 
+        vmax=1,
+        cbar_kws={'label': 'Freq.'}, 
+        ax=ax)
+    ax.set(title=title)
+
+    return ax
+
+def kde_ax(data, transform, le, annotate=True, fill=False, threshold=None, title='', ax=None):
     # Create an axis if none is provided
     if ax == None : ax = plt.gca()
     
@@ -50,7 +63,7 @@ def kde_distributions_ax(data, transform, le_c, annotate=True, fill=False, thres
     _data = data.copy()
 
     # Convert numeric class label to strings to overcome numeric label bug in SNS
-    _data['class'] = le_c.inverse_transform(_data['class'])
+    _data['class'] = le['c'].inverse_transform(_data['class'])
 
     # Plot 2d-lines using normalised KDE density.
     _=sns.kdeplot(_data, x=transform, hue='class',ax=ax)
@@ -60,7 +73,7 @@ def kde_distributions_ax(data, transform, le_c, annotate=True, fill=False, thres
         # Set y-axis to zero at first
         ax_max_y = 0
 
-        for line, class_label in zip(ax.get_lines(), le_c.classes_):
+        for line, class_label in zip(ax.get_lines(), le['c'].classes_):
             x = np.array(line.get_data()[0])
             y = np.array(line.get_data()[1])
 
@@ -95,7 +108,7 @@ def kde_distributions_ax(data, transform, le_c, annotate=True, fill=False, thres
             ax.legend(handles=handles + [dt], loc="upper left", title='Class')
         
         else:
-            ax.legend(labels=le_c.classes_, loc="upper left", title='Class')
+            ax.legend(labels=le['c'].classes_, loc="upper left", title='Class')
 
         ax.set(title=title, xticks=np.arange(0.0, 1.01, 0.1), xlim=(0,1), xlabel='Similarity')
 
@@ -116,7 +129,7 @@ def cm_ax(cm, class_labels=None, values_format='.0f', ax=None):
     
     return ax
 
-def eer_ax(fpr, tpr, thresholds, plot_circles=True, decision_thresh=None, legend='', ax=None):
+def eer_ax(fpr, tpr, thresholds, plot_circles=True, threshold=None, legend='', ax=None):
     # Create an axis if none is provided
     if ax == None : ax = plt.gca()
 
@@ -130,8 +143,8 @@ def eer_ax(fpr, tpr, thresholds, plot_circles=True, decision_thresh=None, legend
         ax.plot(thresholds, fpr, '.', mfc='none', color=fpr_ax[0].get_color())
         ax.plot(thresholds, frr, '.', mfc='none', color=frr_ax[0].get_color())
 
-    if decision_thresh:
-        ax.axvline(decision_thresh, label=f'Threshold {legend}', linestyle='--')
+    if threshold:
+        ax.axvline(threshold, label=f'Threshold {legend}', linestyle='--')
     
     ax.set(
         xlabel="Similarity",

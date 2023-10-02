@@ -130,10 +130,10 @@ def makepretty(styler, **kwargs):
 
     return styler
 
-def macro_stats(data, le_a, le_m, transform, style=True):
+def dist_stats(data, le, transform, style=True):
     stats = data.groupby(["algo", "metric"])[transform].describe().reset_index()
-    stats["algo"] = le_a.inverse_transform(stats["algo"])
-    stats["metric"] = le_m.inverse_transform(stats["metric"])
+    stats["algo"] = le['a'].inverse_transform(stats["algo"])
+    stats["metric"] = le['m'].inverse_transform(stats["metric"])
 
     if style:
         stats = stats.style.pipe(makepretty, title=transform)
@@ -244,15 +244,38 @@ class BitAnalyzer:
 
 # Create a wrapper parallel metrics
 class ComputeMetrics:
+    
     def __init__(
         self, 
-        le,
-        df_d, df_h,
-        analyse_bits: bool,
-        n_jobs=1,
+        le:dict,
+        df_d:pd.DataFrame, 
+        df_h:pd.DataFrame,
+        analyse_bits=False,
+        n_jobs=-1,
         backend="loky",
-        progress_bar=False,
+        progress_bar=True,
     ) -> None:
+        """
+        Compute performance metrics for triplets using JobLib for parallel processing
+
+        Parameters
+        ----------
+        le : dict
+            Dictionary containing LabelEncoders
+            Required key values for encoders
+        df_d : pd.DataFrame
+            Dataframe with distances
+        df_h : pd.DataFrame
+            Dataframe with hash values
+        analyse_bits : bool, optional
+            Whether to analyse bit frequency, by default False
+        n_jobs : int, optional
+            JobLib flag, use all cores, by default -1
+        backend : str, optional
+            JobLib flag, change backend, by default "loky"
+        progress_bar : bool, optional
+            Show progress bar using TQDM, by default True
+        """
         self.le = le
         self.df_d = df_d
         self.df_h = df_h
@@ -261,7 +284,7 @@ class ComputeMetrics:
         self.backend = backend
         self.progress_bar = progress_bar
 
-    def process_triplet(self, triplet, weighted):
+    def _process_triplet(self, triplet, weighted):
         a_s, t_s, m_s = triplet
 
         # from string to integer label encoding
@@ -293,14 +316,29 @@ class ComputeMetrics:
         else:
             return [a_s, t_s, m_s, mm.auc, mm.eer_score, mm.eer_thresh, tn, fp, fn, tp], None
     
-    def fit(self, triplets, weighted):
+    def fit(self, triplets, weighted=False):
+        """
+        Fit object on a list of triplets using JobLib
+
+        Parameters
+        ----------
+        triplets : list
+            List of triplets
+        weighted : bool, optional
+            Apply weighting='balanced' to ConfusionMatrix, by default False
+
+        Returns
+        -------
+        metrics, bit-weights
+            Returns a tuple
+        """
         # Use zip() to return tuple (m, b) from process_triplet
         _m, _b = zip(
             *Parallel(
                 n_jobs=self.n_jobs, 
                 backend=self.backend
                 )(delayed(
-                    self.process_triplet
+                    self._process_triplet
                     )(triplet=t, weighted=weighted)
                 # TODO: fix the progress bar :/
                 for t in tqdm(triplets, desc="Triplet", disable=not self.progress_bar)
@@ -323,3 +361,47 @@ class ComputeMetrics:
             b = dict()
     
         return m, b
+
+def make_bit_weights(bitfreq:dict, algorithms:list, metrics:list, transforms:list) -> dict:
+    """
+    Create median bit weights from analysed bit frequency.
+
+    Parameters
+    ----------
+    bitfreq : dict
+        Dictionary containing the bitfrequency dictionary from a the BitAnalyser
+    algorithms : list
+        Class names from the LabelEncoder used for algorithms
+    metrics : list
+        Class names from the LabelEncoder used for metrics
+    transforms : list
+        Class names from the LabelEncoder used for transformations
+
+    Returns
+    -------
+    dict
+        Dictionary with mean weights for each pair (algorithm, metric)
+    """
+    # Dict to keep weights during loops
+    bit_weights = {}
+
+    # Outer loop
+    for a in algorithms:
+        # Inner loop
+        for m in metrics:
+            pair = f"{a}_{m}"
+            _weights = []
+
+            # Inner-inner loop to process each transform
+            for t in transforms:
+                # Ignore bits from orig-orig
+                if t == 'orig': 
+                    continue
+                else:
+                    # Get the bits from the original triplet
+                    freq = bitfreq[f"{a}_{t}_{m}"]
+                    result = freq.T.median().values 
+                    _weights.append(result)
+            bit_weights[pair] = np.median(_weights, axis=0)
+            del _weights
+    return bit_weights

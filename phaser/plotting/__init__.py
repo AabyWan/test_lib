@@ -3,17 +3,19 @@
 """
 
 from ._plotting import (
-    histogram_fig,
-    kde_distributions_ax,
+    hist_fig,
+    kde_ax,
     cm_ax,
     eer_ax,
-    roc_ax
+    roc_ax,
+    bit_weights_ax
 )
 
 __all__ = [
-    "histogram_fig",
-    "kde_distributions_ax",
+    "hist_fig",
+    "kde_ax",
     "cm_ax",
     "eer_ax",
-    "roc_ax"
+    "roc_ax",
+    "bit_weights_ax"
 ]
