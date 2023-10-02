@@ -7,8 +7,11 @@ Distance metrics should return a normalised value between 0 and 1, and take two 
 import sys
 import numpy as np
 
+# for testing synthetic metric
+import matplotlib.pyplot as plt 
 
-def test_synthetic(u=None, v=None):
+
+def test_synthetic(u=None, v=None, w=None):
     """
     A dummy distance metric to simulate "good" performance.
     Performs caller introspection to determine which distribution to draw from.
@@ -39,4 +42,34 @@ def test_synthetic(u=None, v=None):
 
 
 # Keep track of distance metrics, add here and import in __init__.py when creating new distance metrics.
-__DISTANCE_METRICS__ = [test_synthetic.__name__]
+DISTANCE_METRICS = [test_synthetic.__name__]
+
+
+
+# Demo code to test the synthetic test metric. 
+# It ignores data and draw from different distributions depending on the caller function.
+def pdist_test():
+    nums = []
+    for n in range(10000):
+        nums.append(test_synthetic())
+
+    plt.xlim(0,1)
+    plt.hist(nums, bins=50)
+    plt.show()
+
+def cdist_test():
+    nums = []
+    for n in range(10000):
+        nums.append(test_synthetic())
+
+    plt.xlim(0,1)
+    plt.hist(nums, bins=50)
+    plt.show()
+
+def synthetic_demo():
+    pdist_test() # simulate inter-distances
+    cdist_test() # simulate intra-distances
+
+if __name__ == "__main__":
+    # Demo the synthetic metric
+    synthetic_demo()

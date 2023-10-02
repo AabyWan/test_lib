@@ -1,16 +1,18 @@
 from paper01_conf import *
-from phaser.hashing import PHASH, ColourHash, PdqHash, ComputeHashes
+
+from phaser.hashing import PHash, ColourHash, PdqHash, ComputeHashes
 from phaser.transformers import Border, Flip
 from phaser.utils import dump_labelencoders
 
 # Configure which hashing algorithms to use and their parameters
-ALGOS = {"phash": PHASH(hash_size=8), "colour": ColourHash(), "pdq": PdqHash()}
+ALGOS = {"phash": PHash(hash_size=8), "colour": ColourHash(), "pdq": PdqHash()}
 
 # Configure the transformations
 TRANS = [
-    Border(border_color=(255, 0, 0), border_width=20, saveToPath=""),
-    Border(border_color=(255, 0, 0), border_width=30, saveToPath=""),
-    Flip(direction="Horizontal", saveToPath=""),
+    Border(border_colour=(255, 0, 0), border_width=20, saveToDir=""),
+    Border(border_colour=(255, 0, 0), border_width=30, saveToDir=""),
+    Flip(direction="Horizontal", saveToDir=""),
+
 ]
 
 # Prepare for parallel processing

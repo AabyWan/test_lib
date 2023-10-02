@@ -1,5 +1,5 @@
 
-import pathlib, os, phaser.hashing, phaser.transformers, phaser.similarities._distances
+import pathlib, os, phaser.hashing, phaser.transformers
 from phaser.utils import ImageLoader as IL
 from phaser.utils import dump_labelencoders, load_labelencoders, bin2bool
 
@@ -7,15 +7,12 @@ from phaser.utils import dump_labelencoders, load_labelencoders, bin2bool
 from sklearn.preprocessing import LabelEncoder
 
 # for list modules
-from inspect import getmembers, isfunction
-import scipy.spatial.distance
-import phaser
+import scipy.spatial.distance 
 
 # for comparisons
 import pandas as pd
-from scipy.spatial import distance
-from phaser.similarities import find_inter_samplesize, IntraDistance, InterDistance, validate_metrics
-
+import numpy as np
+from phaser.similarities import find_inter_samplesize, IntraDistance, InterDistance, validate_metrics, DISTANCE_METRICS
 
 def list_modular_components():
 
@@ -24,7 +21,7 @@ def list_modular_components():
     hashes = []
     for name in dir(phaser.hashing):
         try:
-            if issubclass(getattr(phaser.hashing, name), phaser.hashing._algorithms.PerceptualHash):
+            if issubclass(getattr(phaser.hashing, name), phaser.hashing.PerceptualHash):
                 hashes.append(name)
         except TypeError as err:
             pass
@@ -35,18 +32,18 @@ def list_modular_components():
     transformers = []
     for name in dir(phaser.transformers):
         try:
-            if issubclass(getattr(phaser.transformers, name), phaser.transformers._transforms.Transformer):
-                transformers.append(name)
-        except TypeError as err:
+            if issubclass(getattr(phaser.transformers, name), phaser.transformers.Transformer):
+                if name != "Transformer":
+                    transformers.append(name)
+        except TypeError:
             pass
 
-    builtin_distance_metrics = scipy.spatial.distance._METRICS_NAMES
-    comparison_metrics = phaser.similarities._distances.__DISTANCE_METRICS__
-    print (comparison_metrics)
+    builtin_distance_metrics = scipy.spatial.distance._METRICS_NAMES# Not sure there's a better way to get these.
+    comparison_metrics = DISTANCE_METRICS
     return {"Hashes": hashes, "Transformers": transformers, "Scipy Built-in Distance Metrics": builtin_distance_metrics, "Custom Distance Metrics": comparison_metrics}
 
 
-def do_hashing(originals_path:str, algorithms:dict, transformers:list, output_directory:str, progress_report:bool=True) -> None:
+def do_hashing(originals_path:str, algorithms:dict, transformers:list, distance_metrics:dict, output_directory:str, n_jobs=-1, progress_report:bool=True) -> None:
 
     # Get list of images
     imgpath = originals_path
@@ -58,86 +55,90 @@ def do_hashing(originals_path:str, algorithms:dict, transformers:list, output_di
     pathlib.Path(output_directory).mkdir(exist_ok=True)
 
     print("Doing hashing...")
-    ch = phaser.hashing._helpers.ComputeHashes(algorithms, transformers, n_jobs=-1, progress_bar=True)
-    df = ch.fit(list_of_images)
+    ch = phaser.hashing._helpers.ComputeHashes(algorithms, transformers, n_jobs=n_jobs, progress_bar=progress_report)
+    df_h = ch.fit(list_of_images)
 
-    # Create label encoders
-    le_f = LabelEncoder()
-    le_f = le_f.fit(df['filename'])
+    # Create and fit LabelEncoders according to experiment
+    le = {
+        "f": LabelEncoder().fit(df_h["filename"]),
+        "t": LabelEncoder().fit(df_h["transformation"]),
+        "a": LabelEncoder().fit(list(algorithms.keys())),
+        "m": LabelEncoder().fit(list(distance_metrics.keys())),
+        "c": LabelEncoder(),
+    }
 
-    le_t = LabelEncoder()
-    le_t = le_t.fit(df['transformation'])
+    # Hard-code class labels for use when plotting
+    le["c"].classes_ = np.array(["Inter (0)", "Intra (1)"])
 
-    le_a = LabelEncoder()
-    le_a = le_a.fit(list(algorithms.keys()))
+    # Apply LabelEncoder on df_h
+    df_h["filename"] = le["f"].transform(df_h["filename"])
+    df_h["transformation"] = le["t"].transform(df_h["transformation"])
 
-    # Apply LabelEncoders to data
-    df['filename'] = le_f.transform(df['filename'])
-    df['transformation'] = le_t.transform(df['transformation'])
-
-    # Dump LabelEncoders to disk for use in analysis
-    dump_labelencoders({'le_f':le_f,'le_a':le_a,'le_t':le_t}, path=output_directory)
+    # Dump LabelEncoders and df_h to disk
+    dump_labelencoders(le, path=output_directory)
 
     # Dump the dataset
     print("Saving hashes.csv and labels for filenames (f), algorithms (a) and transforms (t) to bzip files..")
     compression_opts = dict(method='bz2', compresslevel=9)
     outfile = os.path.join(output_directory, "hashes.csv.bz2")
-    df.to_csv(outfile, index=False, encoding='utf-8', compression=compression_opts)
+    df_h.to_csv(outfile, index=False, encoding='utf-8', compression=compression_opts)
 
-def calcualte_distances(hash_directory:str, distance_metrics:list, progress_report:bool=True) -> None:
+def calculate_distances(hash_directory:str, distance_metrics:list, progress_report:bool=True, sample_files:int=0, out_dir:str="") -> None:
 
     # Read the precomputed hashes from hashes.csv.bz2
     csv_path = os.path.join(hash_directory, "hashes.csv.bz2")
-
-    df = pd.read_csv("./demo_outputs/hashes.csv.bz2")
+    df_h = pd.read_csv(csv_path)
     print(f"Dataframe loaded from {os.path.abspath(csv_path)}")
 
     # Load the Label Encoders used when generating hashes
-    label_encoders = load_labelencoders(['le_f','le_a','le_t'], path=hash_directory)
-    le_f, le_a, le_t = label_encoders.values()
+    le = load_labelencoders(filename="LabelEncoders", path=hash_directory)
 
-    # Get the unique values and set constants
-    ALGORITHMS = le_a.classes_
-    TRANSFORMS = le_t.classes_
-    print(f"{ALGORITHMS=}")
-    print(f"{TRANSFORMS=}")
+    # Convert binary hashes to boolean for distance computation
+    for a in le["a"].classes_:
+        df_h[a] = df_h[a].apply(bin2bool)
 
-    # Convert binary hashes to boolean
-    for a in ALGORITHMS:
-        df[a] = df[a].apply(bin2bool) #type:ignore
+
+
+    # print(f"Algorithms: \t {', '.join(ALGORITHMS)}")
+    # print(f"Transforms: \t {', '.join(TRANSFORMS)}")
+    # print(f"Metrics: \t {', '.join(METRICS)}")
 
     # Validate distance metrics, or throw an Exception.    
     validate_metrics(distance_metrics)
-    
-    # Configure metric LabelEncoder
-    le_m = LabelEncoder().fit(list(distance_metrics.keys()))
 
-    METRICS = le_m.classes_
-    print(f"{METRICS=}")
-
-    # Dump metric LabelEncoder
-    print(f"Saving metric encoder to le_m.")
-    dump_labelencoders({'le_m':le_m}, path=hash_directory)
+    # If a sub-sample of the files have been chosen, subset the data.
+    # e.g 100 files have been chosen as the subset, present all hashes relating to those 100 files
+    # The total number of rows would then be 100 * len(TRANSFORMS)
+    if sample_files:
+        # Pick the samples
+        unique_filenames = df_h["filename"].unique()
+        unique_filenames = np.random.choice(unique_filenames, size=sample_files, replace=False)
+        
+        # Subset the data
+        df_h = df_h[df_h["filename"].isin(unique_filenames)]
+        print(f"Sampled for {sample_files} files.")
 
     # Compute the intra distances
-    print("\nComputing Intra-distances...")
-    intra = IntraDistance(le_t=le_t, le_m=le_m, le_a=le_a, distance_metrics=distance_metrics, set_class=1, progress_bar=True)
-    intra_df = intra.fit(df)
+    intra = IntraDistance(distance_metrics, le, 1, progress_bar=True)
+    intra_df = intra.fit(df_h)
     print(f"Number of total intra-image comparisons = {len(intra_df)}")
 
     # Compute the inter distances using subsampling
-    n_samples = find_inter_samplesize(len(df['filename'].unique()*1))
-    print(f"\nComputing Inter-distance with {n_samples} samples per image...")
-    inter = InterDistance(le_t, le_m, le_a, distance_metrics=distance_metrics, set_class=0, n_samples=n_samples, progress_bar=True)
-    inter_df = inter.fit(df)
+    n_samples = find_inter_samplesize(len(df_h["filename"].unique() * 1))
+    inter = InterDistance(distance_metrics, le, set_class=0, n_samples=n_samples, progress_bar=True)
+    inter_df = inter.fit(df_h)
 
     print(f"Number of pairwise comparisons = {inter.n_pairs_}")
-    print(f"Number of inter distances = {len(inter_df)}")
+    print(f"Number of total inter distances = {len(inter_df)}")
 
     # Combine distances and save to disk
     dist_df = pd.concat([intra_df,inter_df])
     compression_opts = dict(method='bz2', compresslevel=9)
-    distance_path = os.path.join(hash_directory, "distances.csv.bz2")
+
+    # Default to the same directory as the hashes if no output directory is specified
+    if not out_dir:
+        out_dir = hash_directory
+    distance_path = os.path.join(out_dir, "distances.csv.bz2")
     print(f"Saving distance scores to {os.path.abspath(distance_path)}.")
     dist_df.to_csv(distance_path, index=False, encoding='utf-8', compression=compression_opts)
 

@@ -8,10 +8,10 @@ import seaborn as sns
 from sklearn.metrics import ConfusionMatrixDisplay
 
 
-def hist_fig(data, le, transform, figsize=(5,5)):
-    _m = le['m'].classes_
-    _a = le['a'].classes_
 
+def hist_fig(data, label_encoding, transform, figsize=(5,5), interactive=False):
+    _m = label_encoding['m'].classes_
+    _a = label_encoding['a'].classes_
     n_cols = len(_m)
     n_rows = len(_a)
 
@@ -22,8 +22,8 @@ def hist_fig(data, le, transform, figsize=(5,5)):
     for col_i, metric in enumerate(_m):
         for row_i, algo in enumerate(_a):
             # Transform strings to labels
-            a_label = le['a'].transform(np.array(algo).ravel())
-            m_label = le['m'].transform(np.array(metric).ravel())
+            a_label = label_encoding['a'].transform(np.array(algo).ravel())
+            m_label = label_encoding['m'].transform(np.array(metric).ravel())
 
             # Subset data and get the distances for the chosen transformation
             _X = data.query(f"algo=={a_label} and metric == {m_label}")[transform].values
@@ -38,7 +38,8 @@ def hist_fig(data, le, transform, figsize=(5,5)):
     
     # Close the figure for memory management and to avoid it showing on return
     _ = plt.suptitle(f"Transformation = {transform.capitalize()}")
-    plt.close()
+    if not interactive:
+        plt.close()
     
     return fig
 
@@ -55,7 +56,9 @@ def bit_weights_ax(bits, title="", ax=None):
 
     return ax
 
-def kde_ax(data, transform, le, annotate=True, fill=False, threshold=None, title='', ax=None):
+
+def kde_ax(data, transform, label_encoding, annotate=True, fill=False, threshold=None, title='', ax=None):
+
     # Create an axis if none is provided
     if ax == None : ax = plt.gca()
     
@@ -63,7 +66,8 @@ def kde_ax(data, transform, le, annotate=True, fill=False, threshold=None, title
     _data = data.copy()
 
     # Convert numeric class label to strings to overcome numeric label bug in SNS
-    _data['class'] = le['c'].inverse_transform(_data['class'])
+    _data['class'] = label_encoding['c'].inverse_transform(_data['class'])
+
 
     # Plot 2d-lines using normalised KDE density.
     _=sns.kdeplot(_data, x=transform, hue='class',ax=ax)
@@ -73,7 +77,8 @@ def kde_ax(data, transform, le, annotate=True, fill=False, threshold=None, title
         # Set y-axis to zero at first
         ax_max_y = 0
 
-        for line, class_label in zip(ax.get_lines(), le['c'].classes_):
+
+        for line, class_label in zip(ax.get_lines(), label_encoding['c'].classes_):
             x = np.array(line.get_data()[0])
             y = np.array(line.get_data()[1])
 
@@ -108,7 +113,7 @@ def kde_ax(data, transform, le, annotate=True, fill=False, threshold=None, title
             ax.legend(handles=handles + [dt], loc="upper left", title='Class')
         
         else:
-            ax.legend(labels=le['c'].classes_, loc="upper left", title='Class')
+            ax.legend(labels=label_encoding['c'].classes_, loc="upper left", title='Class')
 
         ax.set(title=title, xticks=np.arange(0.0, 1.01, 0.1), xlim=(0,1), xlabel='Similarity')
 

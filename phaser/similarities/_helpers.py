@@ -1,11 +1,24 @@
+import logging, pathlib
 import numpy as np
 import pandas as pd
-import phaser.similarities
+from ._distances import DISTANCE_METRICS
 from scipy.spatial import distance as dist
 from scipy.spatial.distance import cdist, pdist
 from itertools import combinations
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from typing import Callable
+
+
+
+pathlib.Path("./logs").mkdir(exist_ok=True)
+logging.basicConfig(
+    filename="./logs/process.log",
+    encoding="utf-8",
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
 
 def find_inter_samplesize(num_images: int) -> int:
     for n in range(0, num_images):
@@ -33,10 +46,7 @@ def validate_metrics(metrics: dict) -> bool:
         elif not isinstance(value, Callable):
             invalid.append(f"{mname} is not a valid Callable object.")
         elif isinstance(value, Callable):
-            if (
-                value.__name__
-                not in phaser.similarities._distances.__m_dict__ #type:ignore
-            ):
+            if value.__name__ not in DISTANCE_METRICS:
                 invalid.append(
                     f"{mname} does not appear to be a valid distance function in phaser.similarities"
                 )
@@ -83,6 +93,7 @@ class IntraDistance:
         return cdist(xa, xb, metric=metric_value, w=weights)
 
     def fit(self, data):
+        logging.info("===Begin processing Intra-Distance.===")
         self.files_ = data["filename"].unique()
         self.n_files_ = len(self.files_)
 
@@ -137,6 +148,8 @@ class IntraDistance:
         sim_cols = distances.columns[5:]
         distances[sim_cols] = 1 - distances[sim_cols]
 
+        logging.info(f"Generated {len(distances)} Intra-distance observations.")
+
         return distances
 
 class InterDistance:
@@ -173,6 +186,10 @@ class InterDistance:
         return pdist(hashes, metric_value, w=weights)
 
     def fit(self, data):
+        logging.info(
+            f"===Begin processing Inter-Distance with {self.n_samples} pairwise samples per file.==="
+        )
+                
         # Get the label used to encode 'orig'
         orig_label = self.le['t'].transform(np.array(["orig"]).ravel())[0]
 
@@ -251,5 +268,7 @@ class InterDistance:
         # Convert distances to similarities
         sim_cols = distances.columns[5:]
         distances[sim_cols] = 1 - distances[sim_cols]
+
+        logging.info(f"Generated {len(distances)} Inter-distance observations.")
 
         return distances

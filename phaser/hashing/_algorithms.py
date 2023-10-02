@@ -1,9 +1,7 @@
 import imagehash
 import pdqhash
 import numpy as np
-from joblib import Parallel, delayed
 from abc import ABC, abstractmethod
-import pandas as pd
 
 # Local imports from ..utils
 from ..utils import bool2binstring
@@ -21,7 +19,7 @@ class PerceptualHash(ABC):
         pass
 
 
-class PHASH(PerceptualHash):
+class PHash(PerceptualHash):
     def __init__(self, hash_size=8, highfreq_factor=4):
         self.hash_size = hash_size
         self.highfreq_factor = highfreq_factor
@@ -55,7 +53,6 @@ class WaveHash(PerceptualHash):
     def __init__(
         self, hash_size=8, image_scale=None, mode="haar", remove_max_haar_ll=True
     ) -> None:
-
         self.hash_size = hash_size
         self.image_scale = image_scale
         self.mode = mode
