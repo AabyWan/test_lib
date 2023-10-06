@@ -35,7 +35,7 @@ def bin2bool(hash):
 
 def dump_labelencoders(encoders:dict, path:str) -> None:
     #for name, enc in encoders.items():
-    dump(encoders,f"{path}LabelEncoders.bz2", compress=9)
+    dump(encoders, os.path.join(path, "LabelEncoders.bz2"), compress=9)
 
 def load_labelencoders(filename:str, path:str):
-    return load(f"./{path}{filename}.bz2")
+    return load(os.path.join(path, f"{filename}.bz2"))

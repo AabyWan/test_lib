@@ -83,21 +83,25 @@ def do_hashing(originals_path:str, algorithms:dict, transformers:list, distance_
     outfile = os.path.join(output_directory, "hashes.csv.bz2")
     df_h.to_csv(outfile, index=False, encoding='utf-8', compression=compression_opts)
 
-def calculate_distances(hash_directory:str, distance_metrics:list, progress_report:bool=True, sample_files:int=0, out_dir:str="") -> None:
+def calculate_distances(distance_metrics:list, hash_directory:str="", hash_dataframe:pd.DataFrame=None, label_encodings:dict={}, progress_report:bool=True, sample_files:int=0, out_dir:str="", save_to_disk=True) -> pd.DataFrame:
 
-    # Read the precomputed hashes from hashes.csv.bz2
-    csv_path = os.path.join(hash_directory, "hashes.csv.bz2")
-    df_h = pd.read_csv(csv_path)
-    print(f"Dataframe loaded from {os.path.abspath(csv_path)}")
+    if hash_directory:
+        # A hash directory is specified, load the hash dataframe and the enodings from here, rather than from memmory.
+        # Read the precomputed hashes from hashes.csv.bz2
+        csv_path = os.path.join(hash_directory, "hashes.csv.bz2")
+        df_h = pd.read_csv(csv_path)
+        print(f"Dataframe loaded from {os.path.abspath(csv_path)}")
 
-    # Load the Label Encoders used when generating hashes
-    le = load_labelencoders(filename="LabelEncoders", path=hash_directory)
-
+        # Load the Label Encoders used when generating hashes
+        le = load_labelencoders(filename="LabelEncoders", path=hash_directory)
+    else:
+        # Work with a DataFrame and encodings which are already in memory
+        df_h = hash_dataframe
+        le = label_encodings
+    
     # Convert binary hashes to boolean for distance computation
     for a in le["a"].classes_:
         df_h[a] = df_h[a].apply(bin2bool)
-
-
 
     # print(f"Algorithms: \t {', '.join(ALGORITHMS)}")
     # print(f"Transforms: \t {', '.join(TRANSFORMS)}")
@@ -115,18 +119,18 @@ def calculate_distances(hash_directory:str, distance_metrics:list, progress_repo
         unique_filenames = np.random.choice(unique_filenames, size=sample_files, replace=False)
         
         # Subset the data
-        df_h = df_h[df_h["filename"].isin(unique_filenames)]
+        df_subset = df_h[df_h["filename"].isin(unique_filenames)]
         print(f"Sampled for {sample_files} files.")
 
     # Compute the intra distances
     intra = IntraDistance(distance_metrics, le, 1, progress_bar=True)
-    intra_df = intra.fit(df_h)
+    intra_df = intra.fit(df_subset)
     print(f"Number of total intra-image comparisons = {len(intra_df)}")
 
     # Compute the inter distances using subsampling
     n_samples = find_inter_samplesize(len(df_h["filename"].unique() * 1))
     inter = InterDistance(distance_metrics, le, set_class=0, n_samples=n_samples, progress_bar=True)
-    inter_df = inter.fit(df_h)
+    inter_df = inter.fit(df_subset)
 
     print(f"Number of pairwise comparisons = {inter.n_pairs_}")
     print(f"Number of total inter distances = {len(inter_df)}")
@@ -135,12 +139,15 @@ def calculate_distances(hash_directory:str, distance_metrics:list, progress_repo
     dist_df = pd.concat([intra_df,inter_df])
     compression_opts = dict(method='bz2', compresslevel=9)
 
-    # Default to the same directory as the hashes if no output directory is specified
-    if not out_dir:
-        out_dir = hash_directory
-    distance_path = os.path.join(out_dir, "distances.csv.bz2")
-    print(f"Saving distance scores to {os.path.abspath(distance_path)}.")
-    dist_df.to_csv(distance_path, index=False, encoding='utf-8', compression=compression_opts)
+    if save_to_disk:
+        # Default to the same directory as the hashes if no output directory is specified
+        if not out_dir:
+            out_dir = hash_directory
+        distance_path = os.path.join(out_dir, "distances.csv.bz2")
+        print(f"Saving distance scores to {os.path.abspath(distance_path)}.")
+        dist_df.to_csv(distance_path, index=False, encoding='utf-8', compression=compression_opts)
+
+    return dist_df
 
 
 def main():

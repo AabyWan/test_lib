@@ -284,7 +284,7 @@ class ComputeMetrics:
         self.backend = backend
         self.progress_bar = progress_bar
 
-    def _process_triplet(self, triplet, weighted):
+    def _process_triplet(self, triplet, weighted, normalise=True):
         a_s, t_s, m_s = triplet
 
         # from string to integer label encoding
@@ -303,7 +303,7 @@ class ComputeMetrics:
         mm = MetricMaker(y_true, y_sims, weighted=weighted)
         tn, fp, fn, tp = mm.get_cm(
             threshold=mm.eer_thresh, 
-            normalize='none', 
+            normalise=normalise, 
             breakdown=True)
 
         if self.analyse_bits:
