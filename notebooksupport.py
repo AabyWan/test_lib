@@ -5,6 +5,7 @@ from phaser.utils import dump_labelencoders, load_labelencoders, bin2bool
 
 # for do hashing and comparisons
 from sklearn.preprocessing import LabelEncoder
+from phaser.utils import create_file_batches, format_temp_name, combine_temp_hash_dataframes
 
 # for list modules
 import scipy.spatial.distance 
@@ -43,20 +44,40 @@ def list_modular_components():
     return {"Hashes": hashes, "Transformers": transformers, "Scipy Built-in Distance Metrics": builtin_distance_metrics, "Custom Distance Metrics": comparison_metrics}
 
 
-def do_hashing(originals_path:str, algorithms:dict, transformers:list, distance_metrics:dict, output_directory:str, n_jobs=-1, progress_report:bool=True) -> None:
+def do_hashing(originals_path:str, algorithms:dict, transformers:list, distance_metrics:dict, output_directory:str, n_jobs=-1, progress_report:bool=True, batch_size=100_000) -> None:
 
     # Get list of images
     imgpath = originals_path
     list_of_images = [str(i) for i in pathlib.Path(imgpath).glob('**/*')]
-
-    print(f"Found {len(list_of_images)} images in {os.path.abspath(imgpath)}.")
     
+    print(f"Found {len(list_of_images)} images in {os.path.abspath(imgpath)}.")
     print(f"Creating output directory at {os.path.abspath(output_directory)}...")
     pathlib.Path(output_directory).mkdir(exist_ok=True)
 
+    if len(list_of_images) > batch_size:
+        print(f"Dataset is large, splitting in to smaller chunks (batch size={batch_size}).")
+
+    batches = create_file_batches(list_of_images, batch_size)
+    num_batches = len(batches)
+
+    compression_opts = dict(method='bz2', compresslevel=9)
     print("Doing hashing...")
-    ch = phaser.hashing._helpers.ComputeHashes(algorithms, transformers, n_jobs=n_jobs, progress_bar=progress_report)
-    df_h = ch.fit(list_of_images)
+    for bat in range(0, num_batches):
+        df_h = None
+        if num_batches > 1:
+            print(f"Batch {bat}...")
+        ch = phaser.hashing._helpers.ComputeHashes(algorithms, transformers, n_jobs=n_jobs, progress_bar=progress_report)
+        df_h = ch.fit(batches[bat])
+
+        # Dump temporary hashes, if any
+        if num_batches > 1:
+            outfile = os.path.join(output_directory, format_temp_name(bat))
+            df_h.to_csv(outfile, index=False, encoding='utf-8', compression=compression_opts)
+
+    if num_batches > 1:
+        # Create a single dataframe from the intermediatte dataframes
+        print("Combining temporary csv files...")
+        df_h = combine_temp_hash_dataframes(output_directory=output_directory, num_batches=num_batches)
 
     # Create and fit LabelEncoders according to experiment
     le = {
@@ -75,16 +96,14 @@ def do_hashing(originals_path:str, algorithms:dict, transformers:list, distance_
     df_h["transformation"] = le["t"].transform(df_h["transformation"])
 
     # Dump LabelEncoders and df_h to disk
-    dump_labelencoders(le, path=output_directory)
-
-    # Dump the dataset
     print("Saving hashes.csv and labels for filenames (f), algorithms (a) and transforms (t) to bzip files..")
-    compression_opts = dict(method='bz2', compresslevel=9)
+    dump_labelencoders(le, path=output_directory)
     outfile = os.path.join(output_directory, "hashes.csv.bz2")
     df_h.to_csv(outfile, index=False, encoding='utf-8', compression=compression_opts)
 
-def calculate_distances(distance_metrics:list, hash_directory:str="", hash_dataframe:pd.DataFrame=None, label_encodings:dict={}, progress_report:bool=True, sample_files:int=0, out_dir:str="", save_to_disk=True) -> pd.DataFrame:
+    
 
+def calculate_distances(distance_metrics:list, hash_directory:str="", hash_dataframe:pd.DataFrame=None, label_encodings:dict={}, progress_report:bool=True, sample_files:int=0, out_dir:str="", save_to_disk=True) -> pd.DataFrame:
     if hash_directory:
         # A hash directory is specified, load the hash dataframe and the enodings from here, rather than from memmory.
         # Read the precomputed hashes from hashes.csv.bz2
@@ -93,9 +112,12 @@ def calculate_distances(distance_metrics:list, hash_directory:str="", hash_dataf
         print(f"Dataframe loaded from {os.path.abspath(csv_path)}")
 
         # Load the Label Encoders used when generating hashes
-        le = load_labelencoders(filename="LabelEncoders", path=hash_directory)
+        le = load_labelencoders(path=hash_directory)
     else:
         # Work with a DataFrame and encodings which are already in memory
+
+        if (hash_dataframe == pd.DataFrame()) or (label_encodings == dict({})):
+            raise Exception("Must provide both hash dataframe and label encoding, or a directory to read them from.")
         df_h = hash_dataframe
         le = label_encodings
     
@@ -120,16 +142,18 @@ def calculate_distances(distance_metrics:list, hash_directory:str="", hash_dataf
         
         # Subset the data
         df_subset = df_h[df_h["filename"].isin(unique_filenames)]
-        print(f"Sampled for {sample_files} files.")
-
+        print(f"Sampled {sample_files} files.")
+    else:
+        df_subset = df_h
+        
     # Compute the intra distances
-    intra = IntraDistance(distance_metrics, le, 1, progress_bar=True)
+    intra = IntraDistance(distance_metrics, le, set_class=1, progress_bar=progress_report)
     intra_df = intra.fit(df_subset)
     print(f"Number of total intra-image comparisons = {len(intra_df)}")
 
     # Compute the inter distances using subsampling
     n_samples = find_inter_samplesize(len(df_h["filename"].unique() * 1))
-    inter = InterDistance(distance_metrics, le, set_class=0, n_samples=n_samples, progress_bar=True)
+    inter = InterDistance(distance_metrics, le, set_class=0, n_samples=n_samples, progress_bar=progress_report)
     inter_df = inter.fit(df_subset)
 
     print(f"Number of pairwise comparisons = {inter.n_pairs_}")

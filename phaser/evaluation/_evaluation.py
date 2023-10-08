@@ -284,8 +284,13 @@ class ComputeMetrics:
         self.backend = backend
         self.progress_bar = progress_bar
 
-    def _process_triplet(self, triplet, weighted, normalise=True):
+    def _process_triplet(self, triplet, weighted, normalize=True):
         a_s, t_s, m_s = triplet
+
+        if normalize:
+            normalize = "true"
+        else:
+            normalize = None
 
         # from string to integer label encoding
         a_l = self.le['a'].transform(np.array(a_s).ravel())[0]
@@ -303,7 +308,7 @@ class ComputeMetrics:
         mm = MetricMaker(y_true, y_sims, weighted=weighted)
         tn, fp, fn, tp = mm.get_cm(
             threshold=mm.eer_thresh, 
-            normalise=normalise, 
+            normalize=normalize, 
             breakdown=True)
 
         if self.analyse_bits:
