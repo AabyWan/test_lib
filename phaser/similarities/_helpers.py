@@ -65,7 +65,7 @@ class IntraDistance:
         self,
         m_dict:dict,
         le:dict, 
-        set_class=0, 
+        set_class=1, 
         bit_weights=None, # would expect a dicitonary
         progress_bar=False):
         #
@@ -157,7 +157,7 @@ class InterDistance:
         self,
         m_dict:dict,
         le:dict,
-        set_class=1,
+        set_class=0,
         bit_weights=None,
         n_samples=100,
         random_state=42,

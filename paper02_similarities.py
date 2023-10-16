@@ -1,31 +1,46 @@
-from paper01_conf import *
-from phaser.utils import load_labelencoders, bin2bool
-from phaser.similarities import IntraDistance, find_inter_samplesize, InterDistance
+from paper00_conf import *
+from phaser.similarities import IntraDistance, InterDistance, find_inter_samplesize
 
 # Read the precomputed hashes
-df_h = pd.read_csv("./demo_outputs/hashes.csv.bz2")
+print(f"Loading LabelEncoders and hashing dataset...", end='')
+le = load('./demo_outputs/LabelEncoders.bz2')
+df_h = load('./demo_outputs/Hashes.df.bz2')
+print(f"complete", end='\n')
 
-# Load the Label Encoders used when generating hashes
-le = load_labelencoders(filename="LabelEncoders", path="./demo_outputs/")
+# Find hashes that sum to 0 since they can cause issues with distance metrics
+for a in df_h.columns[2:]:
+    mask = df_h[a].apply(lambda x: sum(x)) == 0
+    bad_filenames = df_h[mask]['filename'].unique()
+    
+    print(f"{len(bad_filenames)} bad filenames found for {a}")
 
-# Convert binary hashes to boolean for distance computation
-for a in le["a"].classes_:
-    df_h[a] = df_h[a].apply(bin2bool)
+    if len(bad_filenames) > 0:
+        df_h = df_h[~df_h['filename'].isin(bad_filenames)]
+
+# Downsample original hashes
+DOWNSMPL = False
+if DOWNSMPL:
+    samplesize = 2000
+    unique_files = sorted(df_h['filename'].unique())
+    sample_files = np.random.choice(unique_files, samplesize, replace=False)
+    df_h = df_h[df_h['filename'].isin(sample_files)]
+    print(f"Saving subset...")
+    dump(value=df_h, filename="./demo_outputs/Hashes_subset.df.bz2", compress=9)
+    print(f"Number of unique files in downsampled data = {len(df_h['filename'].unique())}")
 
 # Compute the intra distances
-intra = IntraDistance(M_DICT, le, 1, progress_bar=True)
-intra_df = intra.fit(df_h)
+intra_df = IntraDistance(METR_dict, le, 1, progress_bar=True).fit(df_h)
 print(f"Number of total intra-image comparisons = {len(intra_df)}")
 
 # Compute the inter distances using subsampling
 n_samples = find_inter_samplesize(len(df_h["filename"].unique() * 1))
-inter = InterDistance(M_DICT, le, set_class=0, n_samples=n_samples, progress_bar=True)
-inter_df = inter.fit(df_h)
+print(f"Number of pairwise comparisons = {n_samples}")
 
-print(f"Number of pairwise comparisons = {inter.n_pairs_}")
+inter_df = InterDistance(METR_dict, le, set_class=0, n_samples=n_samples, progress_bar=True).fit(df_h)
+df_d = pd.concat([intra_df, inter_df])
+
 print(f"Number of total inter distances = {len(inter_df)}")
 
 # Combine distances and save to disk
-df_d = pd.concat([intra_df, inter_df])
-df_d.to_csv("./demo_outputs/distances.csv.bz2", index=False)
+dump(value=df_d, filename="./demo_outputs/distances.df.bz2", compress=9)
 print(f"Script completed")

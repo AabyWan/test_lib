@@ -10,6 +10,7 @@ from ..utils import ImageLoader
 
 
 pathlib.Path("./logs").mkdir(exist_ok=True)
+
 logging.basicConfig(
     filename="./logs/process.log",
     encoding="utf-8",
@@ -67,8 +68,8 @@ class ComputeHashes:
         # joblib returns a list of numpy arrays from sim_hashing
         # the length depends on how many transformations are applied
         # concatenate the list and pass to a dataframe below
-        hashes = np.concatenate(hashes)  # type:ignore
-
+        hashes = np.concatenate(hashes, dtype=object)
+        
         # derive the column names based on the list of algorithms
         cols = ["filename", "transformation", *list(self.algos.keys())]
         df = pd.DataFrame(hashes, columns=cols)
@@ -143,5 +144,6 @@ def sim_hashing(img_path:str, transformations:list=[], algorithms:dict={}) -> np
             outputs.append(
                 [img_path, transform.name, *hashes]
             )  # one set of NAN hashes for each transformation
-    
-    return np.row_stack(outputs)
+            
+    # wrap outputs as np.array and dtype=object to handle [1,[4,5]] shapes
+    return np.row_stack(np.array(outputs, dtype=object))

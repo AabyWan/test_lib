@@ -8,7 +8,8 @@ from ._plotting import (
     cm_ax,
     eer_ax,
     roc_ax,
-    bit_weights_ax
+    bit_weights_ax,
+    auc_cmp_fig
 )
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "cm_ax",
     "eer_ax",
     "roc_ax",
-    "bit_weights_ax"
+    "bit_weights_ax",
+    "auc_cmp_fig"
 ]

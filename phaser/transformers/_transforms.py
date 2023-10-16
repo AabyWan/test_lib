@@ -24,7 +24,7 @@ class Transformer(ABC):
         self.saveToSubDir = saveToSubDir
 
     @abstractmethod
-    def fit(self) -> Image:
+    def fit(self) -> Image.Image:
         """Abstract method that should be defined for all transforms to actually create the modified image. Return a PIL.Image object.
 
         Returns:
@@ -32,7 +32,7 @@ class Transformer(ABC):
         """
         pass
 
-    def saveToDisk(self, image: Image, save_directory:str, filename: str) -> str:
+    def saveToDisk(self, image: Image.Image, save_directory:str, filename: str) -> str:
         """Save the transformed file to disk. Should only be called when needed.
 
         Args:
@@ -87,7 +87,7 @@ class TransformFromDisk(Transformer):
             # Use the folder name if no name is provided.
             self.name = os.path.split(os.path.dirname(self.dirpath))[-1]
 
-    def fit(self, image_obj) -> Image:
+    def fit(self, image_obj) -> Image.Image:
         filename = image_obj.filename
         path = os.path.join(self.dirpath, filename)
         image_obj = ImageLoader(path=path)
@@ -127,7 +127,7 @@ class Border(Transformer):
         self.bc = border_colour
         self.bw = border_width
 
-    def fit(self, image_obj) -> Image:
+    def fit(self, image_obj) -> Image.Image:
         image = deepcopy(image_obj.image)
 
         # Draw the rectangle border on the image
@@ -183,7 +183,7 @@ class Crop(Transformer):
         elif cropbox_factors:
             self.cropbox_factors = cropbox_factors
             if not self.name:
-                self.name = f"Crop{str(cropbox_factors)}x"
+                self.name = f"Crop_{str(cropbox_factors)}"
             self.cropbox_absolute = None
         elif cropbox_absolute:
             self.cropbox_absolute = cropbox_absolute
@@ -191,7 +191,7 @@ class Crop(Transformer):
                 self.name = f"Crop_fixed{str(cropbox_absolute)}"
             self.cropbox_factors = None
 
-    def fit(self, image_obj) -> Image:
+    def fit(self, image_obj) -> Image.Image:
         image = deepcopy(image_obj.image)
 
         if self.cropbox_factors:
@@ -251,7 +251,7 @@ class Enhance(Transformer):
         self.contrastfactor = contrastfactor
         self.sharpnessfactor = sharpnessfactor
 
-    def fit(self, image_obj) -> Image:
+    def fit(self, image_obj) -> Image.Image:
         image = deepcopy(image_obj.image)
 
         if self.colourfactor != 1.0:
@@ -298,7 +298,7 @@ class Flip(Transformer):
             self.name = f"Flip_{direction}"
         self.direction = direction.lower()
 
-    def fit(self, image_obj) -> Image:
+    def fit(self, image_obj) -> Image.Image:
         image = deepcopy(image_obj.image)
 
         if self.direction == "horizontal":
@@ -357,7 +357,7 @@ class Rescale(Transformer):
 
         self.thumbnail = thumbnail_aspect
 
-    def fit(self, image_obj) -> Image:
+    def fit(self, image_obj) -> Image.Image:
         image = deepcopy(image_obj.image)
 
         if self.scalefactor:
@@ -404,7 +404,7 @@ class Rotate(Transformer):
             self.name = f"Rotate_{str(degrees_counter_clockwise)}"
         self.degrees = degrees_counter_clockwise
 
-    def fit(self, image_obj) -> Image:
+    def fit(self, image_obj) -> Image.Image:
         image = deepcopy(image_obj.image)
         image = image.rotate(self.degrees)
 
@@ -452,7 +452,7 @@ class Watermark(Transformer):
         # Load the watermark image to use
         self.watermark_im = Image.open(self.watermark_path)
 
-    def fit(self, image_obj) -> Image:
+    def fit(self, image_obj) -> Image.Image:
         image = deepcopy(image_obj.image)
 
         targetheight = int(image.height * self.height_factor)

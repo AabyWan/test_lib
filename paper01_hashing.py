@@ -1,33 +1,23 @@
-from paper01_conf import *
-
-from phaser.hashing import PHash, ColourHash, PdqHash, ComputeHashes
-from phaser.transformers import Border, Flip
-from phaser.utils import dump_labelencoders
-
-# Configure which hashing algorithms to use and their parameters
-ALGOS = {"phash": PHash(hash_size=8), "colour": ColourHash(), "pdq": PdqHash()}
-
-# Configure the transformations
-TRANS = [
-    Border(border_colour=(255, 0, 0), border_width=20, saveToDir=""),
-    Border(border_colour=(255, 0, 0), border_width=30, saveToDir=""),
-    Flip(direction="Horizontal", saveToDir=""),
-
-]
-
-# Prepare for parallel processing
-ch = ComputeHashes(ALGOS, TRANS, n_jobs=-1, progress_bar=True)
+from paper00_conf import *
+from phaser.hashing import ComputeHashes
 
 # Find all the images and compute hashes
 list_of_image_paths = [str(i) for i in pathlib.Path(IMGPATH).glob("**/*")]
+
+# Ensure files are sorted consistently when subset
+list_of_image_paths = sorted(list_of_image_paths)
+print(f"Found {len(list_of_image_paths)} files/directories in '{SCRIPT_DIR}/Images'")
+
+# Prepare for parallel processing
+ch = ComputeHashes(ALGOS_dict, TRANS_list, n_jobs=-1, progress_bar=True)
 df_h = ch.fit(list_of_image_paths)
 
 # Create and fit LabelEncoders according to experiment
 le = {
     "f": LabelEncoder().fit(df_h["filename"]),
     "t": LabelEncoder().fit(df_h["transformation"]),
-    "a": LabelEncoder().fit(list(ALGOS.keys())),
-    "m": LabelEncoder().fit(list(M_DICT.keys())),
+    "a": LabelEncoder().fit(list(ALGOS_dict.keys())),
+    "m": LabelEncoder().fit(list(METR_dict.keys())),
     "c": LabelEncoder(),
 }
 
@@ -38,7 +28,7 @@ le["c"].classes_ = np.array(["Inter (0)", "Intra (1)"])
 df_h["filename"] = le["f"].transform(df_h["filename"])
 df_h["transformation"] = le["t"].transform(df_h["transformation"])
 
-# Dump LabelEncoders and df_d to disk
-dump_labelencoders(le, path="./demo_outputs/")
-df_h.to_csv("./demo_outputs/hashes.csv.bz2", index=False)
+# Pickle and compress objects to disk
+dump(value=le, filename="./demo_outputs/LabelEncoders.bz2", compress=9)
+dump(value=df_h, filename="./demo_outputs/Hashes.df.bz2", compress=9)
 print(f"Script completed")

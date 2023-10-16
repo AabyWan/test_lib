@@ -3,6 +3,7 @@ demo_outputs/
 test/
 paper/sample_data/
 *.log
+_*.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

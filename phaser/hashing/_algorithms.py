@@ -30,10 +30,10 @@ class PHash(PerceptualHash):
         ).hash
 
         hash = np.array(hash).flatten()
-
+        return hash
         # Convert bool array to a string
-        binary_hash = bool2binstring(hash)
-        return binary_hash
+        #binary_hash = bool2binstring(hash)
+        #return binary_hash
 
 
 class ColourHash(PerceptualHash):
@@ -44,9 +44,9 @@ class ColourHash(PerceptualHash):
         hash = imagehash.colorhash(image=img, binbits=self.binbits).hash
 
         flat_hash = np.concatenate(hash).flatten()
-
-        binary_hash = bool2binstring(flat_hash)
-        return binary_hash
+        return flat_hash
+        #binary_hash = bool2binstring(flat_hash)
+        #return binary_hash
 
 
 class WaveHash(PerceptualHash):
@@ -68,8 +68,9 @@ class WaveHash(PerceptualHash):
         ).hash
 
         flat_hash = np.concatenate(hash).flatten()
-        binary_hash = bool2binstring(flat_hash)
-        return binary_hash
+        return flat_hash
+        #binary_hash = bool2binstring(flat_hash)
+        #return binary_hash
 
 
 class PdqHash(PerceptualHash):
@@ -83,6 +84,7 @@ class PdqHash(PerceptualHash):
         # https://stackoverflow.com/questions/384759/how-do-i-convert-a-pil-image-into-a-numpy-array
         # np.bool_(pdqhash.compute(np.asarray(self.image))[0])
         flat_hash = pdqhash.compute(np.asarray(img))[0].astype(bool)
+        return flat_hash
         # hex_hash = bool2hex(flat_hash)
-        binary_hash = bool2binstring(flat_hash)
-        return binary_hash
+        #binary_hash = bool2binstring(flat_hash)
+        #return binary_hash

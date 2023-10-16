@@ -191,3 +191,41 @@ def roc_ax(fpr, tpr, roc_auc, legend="", ax=None):
 
     ax.legend(loc='lower right')
     return ax
+
+
+def auc_cmp_fig(m, m_w, metric='Hamming'):
+    fig, ax = plt.subplots(
+        1, 
+        2, 
+        figsize=(8, 3), 
+        constrained_layout=True, 
+        sharex=True, 
+        sharey=True)
+    
+    sns.barplot(
+        data=m[m["Metric"] == metric],
+        x="Algorithm",
+        y="AUC",
+        hue="Transform",
+        ax=ax[0])
+
+    sns.barplot(
+        data=m_w[m_w["Metric"] == metric],
+        x="Algorithm",
+        y="AUC",
+        hue="Transform",
+        ax=ax[1])
+
+    handles = ax[0].legend_.legend_handles #type:ignore
+            
+    for handle, txt in zip(handles, ax[0].legend_.texts): #type:ignore
+        # assign the legend labels to the handles
+        handle.set_label(txt.get_text().split("_")[0]) #type:ignore
+
+    _ = ax[0].legend(handles=handles, loc="lower left", title='Transform').remove()
+    _ = ax[1].legend(handles=handles, loc="center right", title='Transform', ncols=1, bbox_to_anchor=(1.41, 0.5))
+
+    _ = ax[0].set(title=f"'{metric}' $without$ bit-weighting")
+    _ = ax[1].set(title=f"'{metric}' $with$ bit-weighting")
+    #_ = plt.ylim(.4,1.01)
+    return fig
